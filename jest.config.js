@@ -25,4 +25,9 @@ module.exports = {
   maxWorkers: 4,
   globalSetup: "./tests/preTest.js",
   globalTeardown: "./tests/postTest.js",
+  transform: {
+    "^.+\\.ts$": "ts-jest",
+    "^.+\\.js$": "babel-jest",
+  },
+  transformIgnorePatterns: ["node_modules/?!@simplewebauthn"],
 };

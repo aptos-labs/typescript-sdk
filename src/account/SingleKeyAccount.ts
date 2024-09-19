@@ -1,10 +1,17 @@
-import { AccountAuthenticatorSingleKey } from "../transactions/authenticator/account";
-import { type HexInput, SigningScheme, SigningSchemeInput } from "../types";
 import { AccountAddress, AccountAddressInput } from "../core/accountAddress";
-import { AnyPublicKey, AnySignature, Ed25519PrivateKey, PrivateKey, Secp256k1PrivateKey } from "../core/crypto";
-import type { Account } from "./Account";
+import {
+  AnyPublicKey,
+  AnySignature,
+  Ed25519PrivateKey,
+  PrivateKey,
+  Secp256k1PrivateKey,
+  Secp256r1PrivateKey,
+} from "../core/crypto";
+import { AccountAuthenticatorSingleKey } from "../transactions/authenticator/account";
 import { generateSigningMessageForTransaction } from "../transactions/transactionBuilder/signingMessage";
 import { AnyRawTransaction } from "../transactions/types";
+import { type HexInput, SigningScheme, SigningSchemeInput } from "../types";
+import type { Account } from "./Account";
 
 export interface SingleKeySignerConstructorArgs {
   privateKey: PrivateKey;
@@ -68,6 +75,9 @@ export class SingleKeyAccount implements Account {
       case SigningSchemeInput.Secp256k1Ecdsa:
         privateKey = Secp256k1PrivateKey.generate();
         break;
+      case SigningSchemeInput.Secp256r1Ecdsa:
+        privateKey = Secp256r1PrivateKey.generate();
+        break;
       default:
         throw new Error(`Unsupported signature scheme ${scheme}`);
     }
@@ -93,6 +103,9 @@ export class SingleKeyAccount implements Account {
         break;
       case SigningSchemeInput.Secp256k1Ecdsa:
         privateKey = Secp256k1PrivateKey.fromDerivationPath(path, mnemonic);
+        break;
+      case SigningSchemeInput.Secp256r1Ecdsa:
+        privateKey = Secp256r1PrivateKey.fromDerivationPath(path, mnemonic);
         break;
       default:
         throw new Error(`Unsupported signature scheme ${scheme}`);

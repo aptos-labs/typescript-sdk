@@ -1,7 +1,9 @@
+import { Passkey } from "./passkey";
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 import { Account } from "./account";
+import { ANS } from "./ans";
 import { AptosConfig } from "./aptosConfig";
 import { Coin } from "./coin";
 import { DigitalAsset } from "./digitalAsset";
@@ -9,12 +11,11 @@ import { Event } from "./event";
 import { Faucet } from "./faucet";
 import { FungibleAsset } from "./fungibleAsset";
 import { General } from "./general";
-import { ANS } from "./ans";
-import { Staking } from "./staking";
-import { Transaction } from "./transaction";
-import { Table } from "./table";
 import { Keyless } from "./keyless";
 import { AptosObject } from "./object";
+import { Staking } from "./staking";
+import { Table } from "./table";
+import { Transaction } from "./transaction";
 
 /**
  * This class is the main entry point into Aptos's
@@ -46,6 +47,8 @@ export class Aptos {
 
   readonly general: General;
 
+  readonly passkey: Passkey;
+
   readonly staking: Staking;
 
   readonly transaction: Transaction;
@@ -66,6 +69,7 @@ export class Aptos {
     this.faucet = new Faucet(this.config);
     this.fungibleAsset = new FungibleAsset(this.config);
     this.general = new General(this.config);
+    this.passkey = new Passkey(this.config);
     this.staking = new Staking(this.config);
     this.transaction = new Transaction(this.config);
     this.table = new Table(this.config);
@@ -85,6 +89,7 @@ export interface Aptos
     Faucet,
     FungibleAsset,
     General,
+    Passkey,
     Keyless,
     Staking,
     Table,
@@ -120,6 +125,7 @@ applyMixin(Aptos, Event, "event");
 applyMixin(Aptos, Faucet, "faucet");
 applyMixin(Aptos, FungibleAsset, "fungibleAsset");
 applyMixin(Aptos, General, "general");
+applyMixin(Aptos, Passkey, "passkey");
 applyMixin(Aptos, Staking, "staking");
 applyMixin(Aptos, Transaction, "transaction");
 applyMixin(Aptos, Table, "table");

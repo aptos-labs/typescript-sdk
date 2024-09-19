@@ -6,16 +6,25 @@
  * It holds different operations to generate a transaction payload, a raw transaction,
  * and a signed transaction that can be simulated, signed and submitted to chain.
  */
+import { p256 } from "@noble/curves/p256";
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
+import { base64URLStringToBuffer, bufferToBase64URLString, startAuthentication } from "@simplewebauthn/browser";
+import { generateAuthenticationOptions } from "@simplewebauthn/server";
+import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { AptosConfig } from "../../api/aptosConfig";
 import { AccountAddress, AccountAddressInput, Hex, PublicKey } from "../../core";
 import { AnyPublicKey, AnySignature, KeylessPublicKey, KeylessSignature, Secp256k1PublicKey } from "../../core/crypto";
 import { Ed25519PublicKey, Ed25519Signature } from "../../core/crypto/ed25519";
+import { Secp256r1PublicKey, Secp256r1Signature } from "../../core/crypto/secp256r1";
+import { WebAuthnSignature } from "../../core/crypto/webauthn";
 import { getInfo } from "../../internal/account";
 import { getLedgerInfo } from "../../internal/general";
 import { getGasPriceEstimation } from "../../internal/transaction";
+import { HexInput } from "../../types";
+import { AllowCredentialOption } from "../../types/passkey";
 import { NetworkToChainId } from "../../utils/apiEndpoints";
 import { DEFAULT_MAX_GAS_AMOUNT, DEFAULT_TXN_EXP_SEC_FROM_NOW } from "../../utils/const";
+import { memoizeAsync } from "../../utils/memoize";
 import { normalizeBundle } from "../../utils/normalizeBundle";
 import {
   AccountAuthenticator,
@@ -42,33 +51,33 @@ import {
   TransactionPayloadMultiSig,
   TransactionPayloadScript,
 } from "../instances";
+import { MultiAgentTransaction } from "../instances/multiAgentTransaction";
 import { SignedTransaction } from "../instances/signedTransaction";
+import { SimpleTransaction } from "../instances/simpleTransaction";
 import {
   AnyRawTransaction,
   AnyTransactionPayloadInstance,
   EntryFunctionArgumentTypes,
+  FunctionABI,
+  InputEntryFunctionDataWithABI,
+  InputEntryFunctionDataWithRemoteABI,
   InputGenerateMultiAgentRawTransactionArgs,
   InputGenerateRawTransactionArgs,
   InputGenerateSingleSignerRawTransactionArgs,
   InputGenerateTransactionOptions,
+  InputGenerateTransactionPayloadDataWithABI,
+  InputGenerateTransactionPayloadDataWithRemoteABI,
+  InputMultiSigDataWithABI,
+  InputMultiSigDataWithRemoteABI,
   InputScriptData,
   InputSimulateTransactionData,
-  InputMultiSigDataWithRemoteABI,
-  InputEntryFunctionDataWithRemoteABI,
-  InputGenerateTransactionPayloadDataWithRemoteABI,
   InputSubmitTransactionData,
-  InputGenerateTransactionPayloadDataWithABI,
-  InputEntryFunctionDataWithABI,
-  InputMultiSigDataWithABI,
-  InputViewFunctionDataWithRemoteABI,
   InputViewFunctionDataWithABI,
-  FunctionABI,
+  InputViewFunctionDataWithRemoteABI,
 } from "../types";
-import { convertArgument, fetchEntryFunctionAbi, fetchViewFunctionAbi, standardizeTypeTags } from "./remoteAbi";
-import { memoizeAsync } from "../../utils/memoize";
 import { getFunctionParts, isScriptDataInput } from "./helpers";
-import { SimpleTransaction } from "../instances/simpleTransaction";
-import { MultiAgentTransaction } from "../instances/multiAgentTransaction";
+import { convertArgument, fetchEntryFunctionAbi, fetchViewFunctionAbi, standardizeTypeTags } from "./remoteAbi";
+import { generateSigningMessageForTransaction } from "./signingMessage";
 
 /**
  * We are defining function signatures, each with its specific input and output.
@@ -468,6 +477,86 @@ export function getAuthenticatorForSimulation(publicKey: PublicKey) {
 
   // TODO add support for AnyMultiKey
   throw new Error("Unsupported public key");
+}
+
+export async function signWithPasskey(args: {
+  publicKey: PublicKey;
+  credentialId: string | Uint8Array;
+  transaction: AnyRawTransaction;
+  timeout?: number;
+  rpID: string;
+  options?: {
+    allowCredentials?: AllowCredentialOption[];
+  };
+}): Promise<AccountAuthenticator> {
+  const { credentialId, publicKey, transaction, timeout, rpID, options } = args;
+
+  if (!(publicKey instanceof Secp256r1PublicKey)) {
+    throw new Error("Unsupported public key for passkey signing.");
+  }
+
+  const allowCredentials: AllowCredentialOption[] = options?.allowCredentials ?? [
+    {
+      id: typeof credentialId !== "string" ? bufferToBase64URLString(credentialId) : credentialId,
+    },
+  ];
+
+  // Get the signing message and hash it to create the challenge
+  const signingMessage = generateSigningMessageForTransaction(transaction);
+  const challenge = sha3Hash(signingMessage);
+
+  const authOptions = await generateAuthenticationOptions({
+    rpID,
+    allowCredentials,
+    challenge,
+    timeout,
+    userVerification: "required",
+  });
+  const authenticationResponse = await startAuthentication(authOptions);
+
+  const authenticatorAssertionResponse = authenticationResponse.response;
+
+  const { clientDataJSON, authenticatorData, signature } = authenticatorAssertionResponse;
+
+  const signatureCompact = p256.Signature.fromDER(
+    new Uint8Array(base64URLStringToBuffer(signature)),
+  ).toCompactRawBytes();
+
+  const webAuthnSignature = new WebAuthnSignature(
+    new Secp256r1Signature(signatureCompact),
+    isoBase64URL.toBuffer(authenticatorData),
+    isoBase64URL.toBuffer(clientDataJSON),
+  );
+
+  return new AccountAuthenticatorSingleKey(new AnyPublicKey(publicKey), new AnySignature(webAuthnSignature));
+}
+
+/**
+ * Creates the and returns the Authenticator for passkey signed transactions.
+ *
+ * @param args.publicKey The public key of the passkey credential.
+ * @param args.signature The P256signature which is the signed challenge.
+ * @param args.authenticatorData The AuthenticatorData of the assertion.
+ * @param args.clientDataJSON The clientDataJSON of the assertion.
+ *
+ * @return The signer AccountAuthenticator
+ */
+export function getAuthenticatorForWebAuthn(args: {
+  publicKey: HexInput;
+  signature: HexInput;
+  authenticatorData: HexInput;
+  clientDataJSON: HexInput;
+}): AccountAuthenticator {
+  const { publicKey, signature, authenticatorData, clientDataJSON } = args;
+  let signatureObj: AnySignature;
+  if (publicKey instanceof Secp256r1PublicKey) {
+    signatureObj = new AnySignature(new Secp256r1Signature(signature));
+  } else {
+    throw new Error("Unsupported public key");
+  }
+  const webAuthnSignature = new WebAuthnSignature(signatureObj, authenticatorData, clientDataJSON);
+
+  return new AccountAuthenticatorSingleKey(new AnyPublicKey(publicKey), new AnySignature(webAuthnSignature));
 }
 
 /**

@@ -8,12 +8,18 @@
  * account namespace and without having a dependency cycle error.
  */
 
+import { Account } from "../account";
 import { AptosConfig } from "../api/aptosConfig";
 import { AptosApiError, getAptosFullNode, paginateWithCursor } from "../client";
+import {
+  AuthenticationKey,
+  Ed25519PrivateKey,
+  Secp256k1PrivateKey,
+  Secp256r1PrivateKey,
+  createObjectAddress,
+} from "../core";
 import { AccountAddress, AccountAddressInput } from "../core/accountAddress";
-import { Account } from "../account";
 import { AnyPublicKey, Ed25519PublicKey, PrivateKey } from "../core/crypto";
-import { queryIndexer } from "./general";
 import {
   AccountData,
   GetAccountCoinsDataResponse,
@@ -35,27 +41,27 @@ import {
   GetAccountCoinsCountQuery,
   GetAccountCoinsDataQuery,
   GetAccountCollectionsWithOwnedTokensQuery,
-  GetObjectDataQuery,
   GetAccountOwnedTokensFromCollectionQuery,
   GetAccountOwnedTokensQuery,
   GetAccountTokensCountQuery,
   GetAccountTransactionsCountQuery,
+  GetObjectDataQuery,
 } from "../types/generated/operations";
 import {
   GetAccountCoinsCount,
   GetAccountCoinsData,
   GetAccountCollectionsWithOwnedTokens,
-  GetObjectData,
   GetAccountOwnedTokens,
   GetAccountOwnedTokensFromCollection,
   GetAccountTokensCount,
   GetAccountTransactionsCount,
+  GetObjectData,
 } from "../types/generated/queries";
-import { memoizeAsync } from "../utils/memoize";
-import { Secp256k1PrivateKey, AuthenticationKey, Ed25519PrivateKey, createObjectAddress } from "../core";
 import { CurrentFungibleAssetBalancesBoolExp } from "../types/generated/types";
-import { getTableItem } from "./table";
 import { APTOS_COIN } from "../utils";
+import { memoizeAsync } from "../utils/memoize";
+import { queryIndexer } from "./general";
+import { getTableItem } from "./table";
 
 export async function getInfo(args: {
   aptosConfig: AptosConfig;
@@ -558,6 +564,13 @@ export async function deriveAccountFromPrivateKey(args: {
 
   if (privateKey instanceof Secp256k1PrivateKey) {
     // private key is secp256k1, therefore we know it for sure uses a single signer key
+    const authKey = AuthenticationKey.fromPublicKey({ publicKey });
+    const address = authKey.derivedAddress();
+    return Account.fromPrivateKey({ privateKey, address });
+  }
+
+  if (privateKey instanceof Secp256r1PrivateKey) {
+    // private key is secp256r1, therefore we know it for sure uses a single signer key
     const authKey = AuthenticationKey.fromPublicKey({ publicKey });
     const address = authKey.derivedAddress();
     return Account.fromPrivateKey({ privateKey, address });

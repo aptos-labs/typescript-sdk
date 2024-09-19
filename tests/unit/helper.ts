@@ -32,6 +32,15 @@ export const secp256k1WalletTestObject = {
     "0x04913871f1d6cb7b867e8671cf63cf7b4c43819539fa0074ff933434bf20bab825b335535251f720fff72fd8b567e414af84aacf2f26ec804562081f2e0b0c9478",
 };
 
+export const secp256r1WalletTestObject = {
+  address: "0x071ce203b24472a3f1fffbc864671aa22694e1bb97a515392c3dcbc88b8142ae",
+  mnemonic: "shoot island position soft burden budget tooth cruel issue economy destroy above",
+  path: "m/44'/637'/0'/0/0",
+  privateKey: "0x1eec55afc2f72c4ab7b46c84d761739035ac420a2b6b22cef3411adaf91ce1f7",
+  publicKey:
+    "0x04a321d7d3d68e87055b021799dd5916ccf102f81e714ed0bc98d8f001fa40e519f75aebd1d397d6963d8d6f920c79f41506adf1e91b745fd2b845c71fe0d297de",
+};
+
 export const zeroWallet = {
   address: "0x00fe71257b6b4caca517ef4c9979ada97aa2e2688e950654a40ff82e98f68163",
   mnemonic: "shoot island position soft burden budget tooth cruel issue economy destroy above",
@@ -82,6 +91,18 @@ export const secp256k1TestObject = {
   stringMessage: "hello world",
   signatureHex:
     "0xd0d634e843b61339473b028105930ace022980708b2855954b977da09df84a770c0b68c29c8ca1b5409a5085b0ec263be80e433c83fcf6debb82f3447e71edca",
+};
+
+export const secp256r1TestObject = {
+  privateKey: "0xd107155adf816a0a94c6db3c9489c13ad8a1eda7ada2e558ba3bfa47c020347e",
+  publicKey:
+    "0x04c81c1005cbaff7cdbabee843b1dcd2cabd21e0b728792c73cdaf92bb37bca7d52e9526bb15a32dd8f542bb62b050532884366369f7acfe7d10d8c3840778de8c",
+  address: "0xbf4cbeb52e99e75bff8908b2c412ae453a2bbaee808f152674193b7866cd1645",
+  authKey: "0xbf4cbeb52e99e75bff8908b2c412ae453a2bbaee808f152674193b7866cd1645",
+  messageEncoded: "68656c6c6f20776f726c64",
+  stringMessage: "hello world",
+  signatureHex:
+    "0x67a8c6539315eea3953c04165d2448f2de9bbb800bf5672af8098b73026292966ea226dfe4591b89da58999ef5e7f659a7d5bbee8aedbabe550e3b7034ddc51b",
 };
 
 export const singleSignerED25519 = {

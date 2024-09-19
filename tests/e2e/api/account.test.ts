@@ -287,6 +287,14 @@ describe("account api", () => {
         const derivedAccount = await aptos.deriveAccountFromPrivateKey({ privateKey: account.privateKey });
         expect(derivedAccount).toStrictEqual(account);
       });
+      test("single sender secp256r1", async () => {
+        const config = new AptosConfig({ network: Network.LOCAL });
+        const aptos = new Aptos(config);
+        const account = Account.generate({ scheme: SigningSchemeInput.Secp256r1Ecdsa });
+
+        const derivedAccount = await aptos.deriveAccountFromPrivateKey({ privateKey: account.privateKey });
+        expect(derivedAccount).toStrictEqual(account);
+      });
       test("legacy ed25519", async () => {
         const config = new AptosConfig({ network: Network.LOCAL });
         const aptos = new Aptos(config);
