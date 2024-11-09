@@ -30,3 +30,12 @@ export function getAptosClient(additionalConfig?: Partial<AptosConfig>): { aptos
   const aptos = new Aptos(config);
   return { aptos, config };
 }
+
+/**
+ * In the browser, Axios will return AxiosHeaders instead of a plain object. It is important to
+ * normalize the headers to an object so that the tests can compare the headers correctly.
+ */
+export const normalizeAptosResponseHeaders = (headers: any) =>
+  process.env.BROWSER_ENV === "1"
+    ? Object.fromEntries(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]))
+    : headers;

@@ -1,10 +1,12 @@
-/** @type {import("ts-jest/dist/types").InitialOptionsTsJest} */
+const isBrowserEnvironment = process.env.BROWSER_ENV === "1";
+
+/** @type {import("ts-jest").JestConfigWithTsJest} */
 module.exports = {
   preset: "ts-jest",
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
-  testEnvironment: "node",
+  testEnvironment: isBrowserEnvironment ? "jsdom" : "node",
   coveragePathIgnorePatterns: [
     "./src/internal/queries/",
     "./src/types/generated",
@@ -12,7 +14,7 @@ module.exports = {
   ],
   testPathIgnorePatterns: ["dist/*", "examples/*"],
   collectCoverage: true,
-  setupFiles: ["dotenv/config"],
+  setupFiles: ["dotenv/config", ...(isBrowserEnvironment ? ["./tests/setupBrowser.js"] : [])],
   coverageThreshold: {
     global: {
       branches: 50, // 90,

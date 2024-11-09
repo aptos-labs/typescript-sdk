@@ -10,7 +10,7 @@ import {
 } from "../../../src";
 import { GetChainTopUserTransactionsQuery } from "../../../src/types/generated/operations";
 import { GetChainTopUserTransactions } from "../../../src/types/generated/queries";
-import { getAptosClient } from "../helper";
+import { getAptosClient, normalizeAptosResponseHeaders } from "../helper";
 
 function getAptosConfig(): AptosConfig {
   const partialConfig = {
@@ -39,15 +39,16 @@ describe("post request", () => {
         },
         overrides: { WITH_CREDENTIALS: false },
       });
-      expect(response.config.headers).toHaveProperty("clientconfig");
-      expect(response.config.headers.clientconfig).toEqual("clientConfig-header");
-      expect(response.config.headers).toHaveProperty("authorization");
-      expect(response.config.headers.authorization).toEqual("Bearer api-key");
-      expect(response.config.headers).toHaveProperty("indexerheader");
-      expect(response.config.headers.indexerheader).toEqual("indexer-header");
+      const headers = normalizeAptosResponseHeaders(response.config.headers);
+      expect(headers).toHaveProperty("clientconfig");
+      expect(headers.clientconfig).toEqual("clientConfig-header");
+      expect(headers).toHaveProperty("authorization");
+      expect(headers.authorization).toEqual("Bearer api-key");
+      expect(headers).toHaveProperty("indexerheader");
+      expect(headers.indexerheader).toEqual("indexer-header");
       // Properties that should not be included
-      expect(response.config.headers).not.toHaveProperty("fullnodeheader");
-      expect(response.config.headers).not.toHaveProperty("faucetheader");
+      expect(headers).not.toHaveProperty("fullnodeheader");
+      expect(headers).not.toHaveProperty("faucetheader");
     });
   });
   describe("fullnode", () => {
@@ -62,15 +63,17 @@ describe("post request", () => {
           arguments: [],
         },
       });
-      expect(response.config.headers).toHaveProperty("clientconfig");
-      expect(response.config.headers.clientconfig).toEqual("clientConfig-header");
-      expect(response.config.headers).toHaveProperty("authorization");
-      expect(response.config.headers.authorization).toEqual("Bearer api-key");
-      expect(response.config.headers).toHaveProperty("fullnodeheader");
-      expect(response.config.headers.fullnodeheader).toEqual("fullnode-header");
+      // Normalize axios headers to an object for browser environment
+      const headers = normalizeAptosResponseHeaders(response.config.headers);
+      expect(headers).toHaveProperty("clientconfig");
+      expect(headers.clientconfig).toEqual("clientConfig-header");
+      expect(headers).toHaveProperty("authorization");
+      expect(headers.authorization).toEqual("Bearer api-key");
+      expect(headers).toHaveProperty("fullnodeheader");
+      expect(headers.fullnodeheader).toEqual("fullnode-header");
       // Properties that should not be included
-      expect(response.config.headers).not.toHaveProperty("indexerheader");
-      expect(response.config.headers).not.toHaveProperty("faucetheader");
+      expect(headers).not.toHaveProperty("indexerheader");
+      expect(headers).not.toHaveProperty("faucetheader");
     });
   });
   describe("faucet", () => {
@@ -85,15 +88,16 @@ describe("post request", () => {
         },
         originMethod: "testQueryFaucet",
       });
-      expect(response.config.headers).toHaveProperty("clientconfig");
-      expect(response.config.headers.clientconfig).toEqual("clientConfig-header");
-      expect(response.config.headers).toHaveProperty("authorization");
-      expect(response.config.headers.authorization).toEqual("Bearer auth-token");
-      expect(response.config.headers).toHaveProperty("faucetheader");
-      expect(response.config.headers.faucetheader).toEqual("faucet-header");
+      const headers = normalizeAptosResponseHeaders(response.config.headers);
+      expect(headers).toHaveProperty("clientconfig");
+      expect(headers.clientconfig).toEqual("clientConfig-header");
+      expect(headers).toHaveProperty("authorization");
+      expect(headers.authorization).toEqual("Bearer auth-token");
+      expect(headers).toHaveProperty("faucetheader");
+      expect(headers.faucetheader).toEqual("faucet-header");
       // Properties that should not be included
-      expect(response.config.headers).not.toHaveProperty("fullnodeheader");
-      expect(response.config.headers).not.toHaveProperty("indexerheader");
+      expect(headers).not.toHaveProperty("fullnodeheader");
+      expect(headers).not.toHaveProperty("indexerheader");
     });
   });
 });
