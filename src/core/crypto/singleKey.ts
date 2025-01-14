@@ -1,5 +1,10 @@
 import { Deserializer, Serializer } from "../../bcs";
-import { AnyPublicKeyVariant, AnySignatureVariant, SigningScheme as AuthenticationKeyScheme } from "../../types";
+import {
+  AnyPublicKeyVariant,
+  AnySignatureVariant,
+  SigningScheme as AuthenticationKeyScheme,
+  HexInput,
+} from "../../types";
 import { AuthenticationKey } from "../authenticationKey";
 import { Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 import { AccountPublicKey, PublicKey, VerifySignatureArgs } from "./publicKey";
@@ -211,6 +216,30 @@ export class AnyPublicKey extends AccountPublicKey {
    */
   static isInstance(publicKey: PublicKey): publicKey is AnyPublicKey {
     return "publicKey" in publicKey && "variant" in publicKey;
+  }
+
+  /**
+   * Recover a Secp256k1 AnyPublicKey from a signature and message.
+   *
+   * @param args.signature - The signature to recover the public key from.
+   * @param args.message - The message that was signed.
+   * @param args.recoveryBit - The recovery bit to use for the public key.
+   */
+  static fromSecp256k1SignatureAndMessage(args: {
+    signature: AnySignature;
+    message: HexInput;
+    recoveryBit: number;
+  }): AnyPublicKey {
+    const { signature, message, recoveryBit } = args;
+    if (!Secp256k1Signature.isInstance(signature.signature)) {
+      throw new Error("AnySignature variant is not Secp256k1");
+    }
+    const publicKey = Secp256k1PublicKey.fromSignatureAndMessage({
+      signature: signature.signature,
+      message,
+      recoveryBit,
+    });
+    return new AnyPublicKey(publicKey);
   }
 }
 

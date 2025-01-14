@@ -4,6 +4,7 @@
 import { sha3_256 } from "@noble/hashes/sha3";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { HDKey } from "@scure/bip32";
+import { bytesToNumberBE, inRange } from "@noble/curves/abstract/utils";
 import { Serializable, Deserializer, Serializer } from "../../bcs";
 import { Hex } from "../hex";
 import { HexInput, PrivateKeyVariants } from "../../types";
@@ -12,6 +13,9 @@ import { PrivateKey } from "./privateKey";
 import { PublicKey, VerifySignatureArgs } from "./publicKey";
 import { Signature } from "./signature";
 import { convertSigningMessage } from "./utils";
+
+const secp256k1P = BigInt("0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f");
+const secp256k1N = BigInt("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141");
 
 /**
  * Represents a Secp256k1 ECDSA public key.
@@ -149,6 +153,35 @@ export class Secp256k1PublicKey extends PublicKey {
    */
   static isInstance(publicKey: PublicKey): publicKey is Secp256k1PublicKey {
     return "key" in publicKey && (publicKey.key as any)?.data?.length === Secp256k1PublicKey.LENGTH;
+  }
+
+  /**
+   * Recover a Secp256k1 public key from a signature and message.
+   *
+   * @param args - The arguments for recovering the public key.
+   * @param args.signature - The signature to recover the public key from.
+   * @param args.message - The message that was signed.
+   * @param args.recoveryBit - The recovery bit to use for the public key.
+   */
+  static fromSignatureAndMessage(args: {
+    signature: Secp256k1Signature;
+    message: HexInput;
+    recoveryBit: number;
+  }): Secp256k1PublicKey {
+    const { signature, message, recoveryBit } = args;
+    const signatureBytes: Uint8Array = signature.toUint8Array();
+
+    const r = bytesToNumberBE(signatureBytes.subarray(0, 32)); // Let r = int(sig[0:32]); fail if r ≥ p.
+    if (!inRange(r, BigInt(1), secp256k1P)) throw new Error("Invalid secp256k1 signature - r ≥ p");
+    const s = bytesToNumberBE(signatureBytes.subarray(32, 64)); // Let s = int(sig[32:64]); fail if s ≥ n.
+    if (!inRange(s, BigInt(1), secp256k1N)) throw new Error("Invalid secp256k1 signature - s ≥ n");
+    const nobleSig = new secp256k1.Signature(r, s);
+
+    const messageToVerify = convertSigningMessage(message);
+    const messageBytes = Hex.fromHexInput(messageToVerify).toUint8Array();
+    const messageSha3Bytes = sha3_256(messageBytes);
+    const publicKeyBytes = nobleSig.addRecoveryBit(recoveryBit).recoverPublicKey(messageSha3Bytes).toRawBytes(false);
+    return new Secp256k1PublicKey(publicKeyBytes);
   }
 }
 
@@ -368,6 +401,11 @@ export class Secp256k1Signature extends Signature {
   static readonly LENGTH = 64;
 
   /**
+   * Automatically added when constructed or de-serialized.  Used for type checking.
+   */
+  private readonly signatureType = "secp256k1";
+
+  /**
    * The signature bytes
    * @private
    * @group Implementation
@@ -417,4 +455,20 @@ export class Secp256k1Signature extends Signature {
   }
 
   // endregion
+
+  /**
+   * Determines if the provided signature is a valid instance of a Secp256k1 signature.
+   * This function checks for the presence of a "data" property and validates the length of the signature data.
+   *
+   * @param signature - The signature to validate.
+   * @returns A boolean indicating whether the signature is a valid Secp256k1 signature.
+   */
+  static isInstance(signature: any): signature is Secp256k1Signature {
+    return (
+      "signatureType" in signature &&
+      signature.signatureType === "secp256k1" &&
+      "data" in signature &&
+      (signature.data.data as any)?.length === Secp256k1Signature.LENGTH
+    );
+  }
 }

@@ -17,6 +17,7 @@ import {
   GetAccountOwnedTokensFromCollectionResponse,
   GetAccountOwnedTokensQueryResponse,
   GetObjectDataQueryResponse,
+  HexInput,
   LedgerVersionArg,
   MoveModuleBytecode,
   MoveResource,
@@ -29,7 +30,7 @@ import {
 } from "../types";
 import { AccountAddress, AccountAddressInput } from "../core/accountAddress";
 import { Account } from "../account";
-import { AnyPublicKey, Ed25519PublicKey, PrivateKey } from "../core/crypto";
+import { AnyPublicKey, AnySignature, Ed25519PublicKey, PrivateKey, Secp256k1Signature } from "../core/crypto";
 import { queryIndexer } from "./general";
 import {
   GetAccountCoinsCountQuery,
@@ -814,4 +815,93 @@ export async function isAccountExist(args: { aptosConfig: AptosConfig; authKey: 
     }
     throw new Error(`Error while looking for an account info ${accountAddress.toString()}`);
   }
+}
+
+/**
+ * Verifies a Secp256k1 account by checking the signature against the message and account's authentication key.
+ *
+ * This function takes a message and signature, and attempts to recover the public key that created the signature.
+ * It then verifies that the recovered public key matches the authentication key stored on-chain for the provided account address.
+ *
+ * If a recovery bit is provided, it will only attempt verification with that specific recovery bit.
+ * Otherwise, it will try all possible recovery bits (0-3) until it finds a match.
+ *
+ * @param args - The arguments for verifying the Secp256k1 account
+ * @param args.aptosConfig - The configuration for connecting to the Aptos blockchain.
+ * @param args.message - The message that was signed
+ * @param args.signature - The signature to verify (either raw hex or Secp256k1Signature object)
+ * @param args.recoveryBit - Optional specific recovery bit to use for verification
+ * @param args.accountAddress - The address of the account to verify
+ * @returns The recovered public key if verification succeeds
+ * @throws Error if verification fails or no matching public key is found
+ *
+ * @example
+ * ```typescript
+ * import { AptosConfig, Network } from "@aptos-labs/ts-sdk";
+ *
+ * const config = new AptosConfig({ network: Network.DEVNET });
+ *
+ * const publicKey = await verifySecp256k1Account({
+ *   aptosConfig,
+ *   message: "0x1234...",
+ *   signature: "0x5678...",
+ *   accountAddress: "0x1"
+ * });
+ * ```
+ */
+export async function verifySecp256k1Account(args: {
+  aptosConfig: AptosConfig;
+  message: HexInput;
+  signature: Secp256k1Signature | AnySignature;
+  accountAddress: AccountAddressInput;
+  recoveryBit?: number;
+}): Promise<AnyPublicKey> {
+  const { aptosConfig, message, recoveryBit, accountAddress } = args;
+  const signature = AnySignature.isInstance(args.signature) ? args.signature : new AnySignature(args.signature);
+
+  const { authentication_key: authKeyString } = await getInfo({
+    aptosConfig,
+    accountAddress,
+  });
+  const authKey = new AuthenticationKey({ data: authKeyString });
+
+  if (recoveryBit !== undefined) {
+    const publicKey = AnyPublicKey.fromSecp256k1SignatureAndMessage({
+      signature,
+      message,
+      recoveryBit,
+    });
+    const derivedAuthKey = publicKey.authKey();
+    if (authKey.toStringWithoutPrefix() === derivedAuthKey.toStringWithoutPrefix()) {
+      return publicKey;
+    }
+    throw new Error(
+      // eslint-disable-next-line max-len
+      `Derived authentication key ${derivedAuthKey.toString()} does not match the authentication key ${authKey.toString()} for account ${accountAddress.toString()}`,
+    );
+  }
+
+  for (let i = 0; i < 4; i += 1) {
+    try {
+      const publicKey = AnyPublicKey.fromSecp256k1SignatureAndMessage({
+        signature,
+        message,
+        recoveryBit: i,
+      });
+      const derivedAuthKey = publicKey.authKey();
+      if (authKey.toStringWithoutPrefix() === derivedAuthKey.toStringWithoutPrefix()) {
+        return publicKey;
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("recovery id")) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  throw new Error(
+    `Failed to recover the public key matching authentication key ${authKey.toString()} for account ${accountAddress.toString()}`,
+  );
 }

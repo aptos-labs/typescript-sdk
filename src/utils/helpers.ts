@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { decode } from "js-base64";
-import { MoveStructId } from "../types";
+import { HexInput, MoveStructId } from "../types";
 
 /**
  * Sleep for the specified amount of time in milliseconds.
@@ -175,3 +175,11 @@ export const isEncodedStruct = (
   typeof structObj.account_address === "string" &&
   typeof structObj.module_name === "string" &&
   typeof structObj.struct_name === "string";
+
+/**
+ * Type guard to check if a value is of type HexInput
+ * @param value The value to check
+ */
+export function isHexInput(value: unknown): value is HexInput {
+  return value instanceof Uint8Array || typeof value === "string";
+}

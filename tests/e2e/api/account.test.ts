@@ -11,6 +11,8 @@ import {
   SigningSchemeInput,
   U64,
   AccountAddress,
+  SingleKeyAccount,
+  Secp256k1PrivateKey,
 } from "../../../src";
 import { getAptosClient } from "../helper";
 
@@ -299,6 +301,99 @@ describe("account api", () => {
 
       expect(tokens.length).toBe(1);
       expect(tokens[0].current_token_data?.token_name).toBe("Test Token");
+    });
+
+    test("it verifies a secp256k1 signature", async () => {
+      const config = new AptosConfig({ network: Network.LOCAL });
+      const aptos = new Aptos(config);
+      const account = new SingleKeyAccount({
+        privateKey: new Secp256k1PrivateKey(
+          "secp256k1-priv-0x1111111111111111111111111111111111111111111111111111111111111111",
+        ),
+      });
+      await aptos.fundAccount({ accountAddress: account.accountAddress, amount: 100 });
+      const message = new TextEncoder().encode("hello");
+      const signature = account.sign(message);
+
+      const pubKey = await aptos.verifySecp256k1Account({
+        message,
+        signature,
+        accountAddress: account.accountAddress,
+      });
+      expect(pubKey.toString()).toBe(account.publicKey.toString());
+    });
+
+    test("verification of a secp256k1 signature fails with invalid message", async () => {
+      const config = new AptosConfig({ network: Network.LOCAL });
+      const aptos = new Aptos(config);
+      const account = new SingleKeyAccount({
+        privateKey: new Secp256k1PrivateKey(
+          "secp256k1-priv-0x1111111111111111111111111111111111111111111111111111111111111111",
+        ),
+      });
+      await aptos.fundAccount({ accountAddress: account.accountAddress, amount: 100 });
+      const message = new TextEncoder().encode("hello");
+      const signature = account.sign(message);
+
+      await expect(
+        aptos.verifySecp256k1Account({
+          message: new TextEncoder().encode("hi"),
+          signature,
+          accountAddress: account.accountAddress,
+        }),
+      ).rejects.toThrow("Failed to recover the public key");
+    });
+
+    test("verification of a secp256k1 signature fails with wrong address", async () => {
+      const config = new AptosConfig({ network: Network.LOCAL });
+      const aptos = new Aptos(config);
+      const account = new SingleKeyAccount({
+        privateKey: new Secp256k1PrivateKey(
+          "secp256k1-priv-0x1111111111111111111111111111111111111111111111111111111111111111",
+        ),
+      });
+      await aptos.fundAccount({ accountAddress: account.accountAddress, amount: 100 });
+      const message = new TextEncoder().encode("hello");
+      const signature = account.sign(message);
+
+      await expect(
+        aptos.verifySecp256k1Account({
+          message,
+          signature,
+          accountAddress: "0x1",
+        }),
+      ).rejects.toThrow("Failed to recover the public key");
+    });
+
+    test("verification of a secp256k1 signature fails with invalid recovery bit", async () => {
+      const config = new AptosConfig({ network: Network.LOCAL });
+      const aptos = new Aptos(config);
+      const account = new SingleKeyAccount({
+        privateKey: new Secp256k1PrivateKey(
+          "secp256k1-priv-0x1111111111111111111111111111111111111111111111111111111111111111",
+        ),
+      });
+      await aptos.fundAccount({ accountAddress: account.accountAddress, amount: 100 });
+      const message = new TextEncoder().encode("hello");
+      const signature = account.sign(message);
+
+      await expect(
+        aptos.verifySecp256k1Account({
+          message,
+          signature,
+          accountAddress: account.accountAddress,
+          recoveryBit: 0,
+        }),
+      ).rejects.toThrow("does not match the authentication key");
+
+      await expect(
+        aptos.verifySecp256k1Account({
+          message,
+          signature,
+          accountAddress: account.accountAddress,
+          recoveryBit: 3,
+        }),
+      ).rejects.toThrow("recovery id 2 or 3 invalid");
     });
 
     describe("it derives an account from a private key", () => {

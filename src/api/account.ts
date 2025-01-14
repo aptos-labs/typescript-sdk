@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Account as AccountModule } from "../account";
-import { AccountAddress, PrivateKey, AccountAddressInput, createObjectAddress } from "../core";
+import {
+  AccountAddress,
+  PrivateKey,
+  AccountAddressInput,
+  createObjectAddress,
+  Secp256k1Signature,
+  AnyPublicKey,
+  AnySignature,
+} from "../core";
 import {
   AccountData,
   AnyNumber,
@@ -11,6 +19,7 @@ import {
   GetAccountOwnedTokensFromCollectionResponse,
   GetAccountOwnedTokensQueryResponse,
   GetObjectDataQueryResponse,
+  HexInput,
   LedgerVersionArg,
   MoveModuleBytecode,
   MoveResource,
@@ -39,6 +48,7 @@ import {
   getResources,
   getTransactions,
   lookupOriginalAccountAddress,
+  verifySecp256k1Account,
 } from "../internal/account";
 import { APTOS_COIN, APTOS_FA, ProcessorType } from "../utils/const";
 import { AptosConfig } from "./aptosConfig";
@@ -893,5 +903,45 @@ export class Account {
    */
   async deriveAccountFromPrivateKey(args: { privateKey: PrivateKey }): Promise<AccountModule> {
     return deriveAccountFromPrivateKey({ aptosConfig: this.config, ...args });
+  }
+
+  /**
+   * Verifies a Secp256k1 account by checking the signature against the message and account's authentication key.
+   *
+   * This function takes a message and signature, and attempts to recover the public key that created the signature.
+   * It then verifies that the recovered public key matches the authentication key stored on-chain for the provided account address.
+   *
+   * If a recovery bit is provided, it will only attempt verification with that specific recovery bit.
+   * Otherwise, it will try all possible recovery bits (0-3) until it finds a match.
+   *
+   * @param args - The arguments for verifying the Secp256k1 account
+   * @param args.message - The message that was signed
+   * @param args.signature - The signature to verify (either raw hex or Secp256k1Signature object)
+   * @param args.recoveryBit - Optional specific recovery bit to use for verification
+   * @param args.accountAddress - The address of the account to verify
+   * @returns The recovered public key if verification succeeds
+   * @throws Error if verification fails or no matching public key is found
+   *
+   * @example
+   * ```typescript
+   * import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
+   *
+   * const config = new AptosConfig({ network: Network.DEVNET });
+   * const aptos = new Aptos(config);
+   *
+   * const publicKey = await aptos.verifySecp256k1Account({
+   *   message: "0x1234...",
+   *   signature: "0x5678...",
+   *   accountAddress: "0x1"
+   * });
+   * ```
+   */
+  async verifySecp256k1Account(args: {
+    message: HexInput;
+    signature: Secp256k1Signature | AnySignature;
+    recoveryBit?: number;
+    accountAddress: AccountAddressInput;
+  }): Promise<AnyPublicKey> {
+    return verifySecp256k1Account({ aptosConfig: this.config, ...args });
   }
 }
