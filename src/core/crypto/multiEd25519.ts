@@ -209,6 +209,62 @@ export class MultiEd25519PublicKey extends AccountPublicKey {
   }
 
   // endregion
+
+  /**
+   * Create a bitmap that holds the mapping from the original public keys
+   * to the signatures passed in
+   *
+   * @param args.bits array of the index mapping to the matching public keys
+   * @returns Uint8array bit map
+   */
+  createBitmap(args: { bits: number[] }): Uint8Array {
+    const { bits } = args;
+    // Bits are read from left to right. e.g. 0b10000000 represents the first bit is set in one byte.
+    // The decimal value of 0b10000000 is 128.
+    const firstBitInByte = 128;
+    const bitmap = new Uint8Array([0, 0, 0, 0]);
+
+    // Check if duplicates exist in bits
+    const dupCheckSet = new Set();
+
+    bits.forEach((bit: number, idx: number) => {
+      if (idx + 1 > this.publicKeys.length) {
+        throw new Error(`Signature index ${idx + 1} is out of public keys range, ${this.publicKeys.length}.`);
+      }
+
+      if (dupCheckSet.has(bit)) {
+        throw new Error(`Duplicate bit ${bit} detected.`);
+      }
+
+      dupCheckSet.add(bit);
+
+      const byteOffset = Math.floor(bit / 8);
+
+      let byte = bitmap[byteOffset];
+
+      // eslint-disable-next-line no-bitwise
+      byte |= firstBitInByte >> bit % 8;
+
+      bitmap[byteOffset] = byte;
+    });
+
+    return bitmap;
+  }
+
+  /**
+   * Get the index of the provided public key.
+   *
+   * @param publicKey array of the index mapping to the matching public keys
+   * @returns the corresponding index of the publicKey, if it exists
+   */
+  getIndex(publicKey: Ed25519PublicKey): number {
+    const index = this.publicKeys.findIndex((pk) => pk.toString() === publicKey.toString());
+
+    if (index !== -1) {
+      return index;
+    }
+    throw new Error("Public key not found in MultiEd25519PublicKey");
+  }
 }
 
 /**
