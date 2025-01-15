@@ -7,12 +7,15 @@ module FACoin::fa_coin {
     use aptos_framework::primary_fungible_store;
     use std::error;
     use std::signer;
+    use std::string;
     use std::string::utf8;
     use std::option;
 
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
 
+    // TODO: For the "Your First Fungible Asset" guide, please update these values to change the ASSET NAME and SYMBOL when this is published.
+    const ASSET_NAME: vector<u8> = b"Tutorial Token";
     const ASSET_SYMBOL: vector<u8> = b"FA";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -28,13 +31,13 @@ module FACoin::fa_coin {
     fun init_module(admin: &signer) {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
-            constructor_ref,
-            option::none(),
-            utf8(b"FA Coin"), /* name */
-            utf8(ASSET_SYMBOL), /* symbol */
-            8, /* decimals */
-            utf8(b"http://example.com/favicon.ico"), /* icon */
-            utf8(b"http://example.com"), /* project */
+            constructor_ref, /* ConstructorRef - The temporary ConstructorRef gives permission to create this PrimaryStore */
+            option::none(), /* Supply - option::none() indicates the supply is uncapped */
+            utf8(ASSET_NAME), /* Name - Used to indicate which asset this is */
+            utf8(ASSET_SYMBOL), /* Symbol - A shortened acronym used interchangeably with the name. Usually 3 letters long. */
+            8, /* Decimals - The number of digits of precision in the fungible asset. */
+            utf8(b"http://example.com/favicon.ico"), /* Icon - A link to an icon which can be rendered in application front-ends. */
+            utf8(b"http://example.com"), /* Project - A link to where people using this token can learn more about it or the organization behind it. */
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
@@ -53,6 +56,12 @@ module FACoin::fa_coin {
     public fun get_metadata(): Object<Metadata> {
         let asset_address = object::create_object_address(&@FACoin, ASSET_SYMBOL);
         object::address_to_object<Metadata>(asset_address)
+    }
+
+    #[view]
+    public fun get_name(): string::String {
+        let metadata = get_metadata();
+        fungible_asset::name(metadata)
     }
 
     // :!:>mint
