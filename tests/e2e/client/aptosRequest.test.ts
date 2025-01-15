@@ -11,7 +11,7 @@ import {
 import { AptosApiError } from "../../../src/errors";
 import { VERSION } from "../../../src/version";
 import { longTestTimeout } from "../../unit/helper";
-import { getAptosClient } from "../helper";
+import { getAptosClient, normalizeAptosResponseHeaders } from "../helper";
 import { singleSignerScriptBytecode } from "../transaction/helper";
 
 const { aptos, config } = getAptosClient();
@@ -55,13 +55,11 @@ describe("aptos request", () => {
             config,
             AptosApiType.FULLNODE,
           );
-          expect(response.config.headers).toHaveProperty("x-aptos-client", `aptos-typescript-sdk/${VERSION}`);
-          expect(response.config.headers).toHaveProperty("my", "header");
-          expect(response.config.headers).toHaveProperty("content-type", "application/x.aptos.signed_transaction+bcs");
-          expect(response.config.headers).toHaveProperty(
-            "x-aptos-typescript-sdk-origin-method",
-            "test request includes all headers",
-          );
+          const headers = normalizeAptosResponseHeaders(response.config.headers);
+          expect(headers).toHaveProperty("x-aptos-client", `aptos-typescript-sdk/${VERSION}`);
+          expect(headers).toHaveProperty("my", "header");
+          expect(headers).toHaveProperty("content-type", "application/x.aptos.signed_transaction+bcs");
+          expect(headers).toHaveProperty("x-aptos-typescript-sdk-origin-method", "test request includes all headers");
         } catch (error: any) {
           // should not get here
           // eslint-disable-next-line no-console
@@ -89,7 +87,8 @@ describe("aptos request", () => {
             config,
             AptosApiType.FULLNODE,
           );
-          expect(response.config.headers).toHaveProperty("authorization", `Bearer ${dummyKey}`);
+          const headers = normalizeAptosResponseHeaders(response.config.headers);
+          expect(headers).toHaveProperty("authorization", `Bearer ${dummyKey}`);
         } catch (error: any) {
           // should not get here
           // eslint-disable-next-line no-console
