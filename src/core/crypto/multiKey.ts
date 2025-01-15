@@ -170,7 +170,7 @@ export class MultiKey extends AccountPublicKey {
     // Bits are read from left to right. e.g. 0b10000000 represents the first bit is set in one byte.
     // The decimal value of 0b10000000 is 128.
     const firstBitInByte = 128;
-    const bitmap = new Uint8Array([0, 0, 0, 0]);
+    const bitmap: number[] = [];
 
     // Check if duplicates exist in bits
     const dupCheckSet = new Set();
@@ -188,6 +188,13 @@ export class MultiKey extends AccountPublicKey {
 
       const byteOffset = Math.floor(bit / 8);
 
+      // Extend by required number of bytes
+      if (bitmap.length < byteOffset) {
+        for (let i = bitmap.length; i < byteOffset; i += 1) {
+          bitmap.push(0);
+        }
+      }
+
       let byte = bitmap[byteOffset];
 
       // eslint-disable-next-line no-bitwise
@@ -196,7 +203,7 @@ export class MultiKey extends AccountPublicKey {
       bitmap[byteOffset] = byte;
     });
 
-    return bitmap;
+    return new Uint8Array(bitmap);
   }
 
   /**
@@ -294,8 +301,6 @@ export class MultiKeySignature extends Signature {
 
     if (!(bitmap instanceof Uint8Array)) {
       this.bitmap = MultiKeySignature.createBitmap({ bits: bitmap });
-    } else if (bitmap.length !== MultiKeySignature.BITMAP_LEN) {
-      throw new Error(`"bitmap" length should be ${MultiKeySignature.BITMAP_LEN}`);
     } else {
       this.bitmap = bitmap;
     }

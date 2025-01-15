@@ -12,6 +12,8 @@ import {
   TransactionPayloadEntryFunction,
   Bool,
   MoveString,
+  Ed25519PublicKey,
+  AnyPublicKey,
 } from "../../../src";
 import { MAX_U64_BIG_INT } from "../../../src/bcs/consts";
 import { longTestTimeout } from "../../unit/helper";
@@ -672,6 +674,115 @@ describe("transaction submission", () => {
         signaturesRequired: 2,
       });
       expect(() => new MultiKeyAccount({ multiKey, signers: [singleSignerED25519SenderAccount] })).toThrow();
+    });
+
+    test("it submits a multi key transaction with lots of signers", async () => {
+      const subAccounts = [];
+      for (let i = 0; i < 32; i += 1) {
+        switch (i % 3) {
+          case 0:
+            subAccounts.push(Account.generate({ scheme: SigningSchemeInput.Ed25519, legacy: false }));
+            break;
+          case 1:
+            subAccounts.push(Account.generate({ scheme: SigningSchemeInput.Ed25519, legacy: true }));
+            break;
+          case 2:
+            subAccounts.push(Account.generate({ scheme: SigningSchemeInput.Secp256k1Ecdsa }));
+            break;
+          default:
+            break;
+        }
+      }
+      const publicKeys = subAccounts.map((account) => {
+        if (account.publicKey instanceof Ed25519PublicKey) {
+          return new AnyPublicKey(account.publicKey);
+        }
+        return account.publicKey;
+      });
+
+      const multiKey = new MultiKey({
+        publicKeys,
+        signaturesRequired: 1,
+      });
+
+      const account = new MultiKeyAccount({
+        multiKey,
+        signers: subAccounts,
+      });
+
+      await aptos.fundAccount({ accountAddress: account.accountAddress, amount: 100_000_000 });
+
+      const transaction = await aptos.transaction.build.simple({
+        sender: account.accountAddress,
+        data: {
+          function: `0x${contractPublisherAccount.accountAddress.toStringWithoutPrefix()}::transfer::transfer`,
+          functionArguments: [1, receiverAccounts[0].accountAddress],
+        },
+      });
+
+      const senderAuthenticator = aptos.transaction.sign({ signer: account, transaction });
+
+      const response = await aptos.transaction.submit.simple({ transaction, senderAuthenticator });
+      await aptos.waitForTransaction({
+        transactionHash: response.hash,
+      });
+      expect(response.signature?.type).toBe("single_sender");
+
+      // Sign with only one of them now
+      const account2 = new MultiKeyAccount({
+        multiKey,
+        signers: [subAccounts[0]],
+      });
+      expect(account2.accountAddress).toEqual(account.accountAddress);
+
+      await aptos.fundAccount({ accountAddress: account2.accountAddress, amount: 100_000_000 });
+
+      const transaction2 = await aptos.transaction.build.simple({
+        sender: account2.accountAddress,
+        data: {
+          function: `0x${contractPublisherAccount.accountAddress.toStringWithoutPrefix()}::transfer::transfer`,
+          functionArguments: [1, receiverAccounts[0].accountAddress],
+        },
+      });
+
+      const senderAuthenticator2 = aptos.transaction.sign({ signer: account2, transaction: transaction2 });
+
+      const response2 = await aptos.transaction.submit.simple({
+        transaction: transaction2,
+        senderAuthenticator: senderAuthenticator2,
+      });
+      await aptos.waitForTransaction({
+        transactionHash: response2.hash,
+      });
+      expect(response2.signature?.type).toBe("single_sender");
+
+      // Sign with the last one now
+      const account3 = new MultiKeyAccount({
+        multiKey,
+        signers: [subAccounts[31]],
+      });
+      expect(account3.accountAddress).toEqual(account.accountAddress);
+
+      await aptos.fundAccount({ accountAddress: account3.accountAddress, amount: 100_000_000 });
+
+      const transaction3 = await aptos.transaction.build.simple({
+        sender: account3.accountAddress,
+        data: {
+          function: `0x${contractPublisherAccount.accountAddress.toStringWithoutPrefix()}::transfer::transfer`,
+          functionArguments: [1, receiverAccounts[0].accountAddress],
+        },
+      });
+
+      const senderAuthenticator3 = aptos.transaction.sign({ signer: account3, transaction: transaction3 });
+
+      const response3 = await aptos.transaction.submit.simple({
+        transaction: transaction3,
+        senderAuthenticator: senderAuthenticator3,
+      });
+      await aptos.waitForTransaction({
+        transactionHash: response3.hash,
+      });
+      expect(response3.signature?.type).toBe("single_sender");
     });
   });
   describe("publish move module", () => {

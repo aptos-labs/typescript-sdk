@@ -5,6 +5,7 @@ All notable changes to the Aptos TypeScript SDK will be captured in this file. T
 # Unreleased
 - [`Fix`] Fixes pagination for GetAccountModules and GetAccountResources.  Also, adds more appropriate documentation on offset.
 
+- [`fix`] Allow variable length bitmaps in Multikey accounts, allowing for compatibility between SDKs properly
 - node now no longer supports older than v20
 - overriding cross spawn for patch
 - Add `AccountUtils` class to help with account serialization and deserialization

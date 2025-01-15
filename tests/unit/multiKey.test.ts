@@ -1,7 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Deserializer, Ed25519PublicKey, Secp256k1PublicKey, MultiKey } from "../../src";
+import {
+  Deserializer,
+  Ed25519PublicKey,
+  Secp256k1PublicKey,
+  MultiKey,
+  Hex,
+  MultiKeySignature,
+  Serializer,
+} from "../../src";
 import { multiKeyTestObject } from "./helper";
 
 describe("MultiKey", () => {
@@ -116,5 +124,18 @@ describe("MultiKey", () => {
     });
     const bitmap = multiKey.createBitmap({ bits: [0, 2] });
     expect(bitmap).toEqual(new Uint8Array(multiKeyTestObject.bitmap));
+  });
+
+  it("should be able to decode from other SDKs", () => {
+    const serializedBytes = Hex.fromHexString(
+      // eslint-disable-next-line max-len
+      "020140118d6ebe543aaf3a541453f98a5748ab5b9e3f96d781b8c0a43740af2b65c03529fdf62b7de7aad9150770e0994dc4e0714795fdebf312be66cd0550c607755e00401a90421453aa53fa5a7aa3dfe70d913823cbf087bf372a762219ccc824d3a0eeecccaa9d34f22db4366aec61fb6c204d2440f4ed288bc7cc7e407b766723a60901c0",
+    ).toUint8Array();
+    const deserializer = new Deserializer(serializedBytes);
+    const multiKeySig = MultiKeySignature.deserialize(deserializer);
+    const serializer = new Serializer();
+    multiKeySig.serialize(serializer);
+    const outBytes = serializer.toUint8Array();
+    expect(outBytes).toEqual(serializedBytes);
   });
 });
