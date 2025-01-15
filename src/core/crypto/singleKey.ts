@@ -7,6 +7,7 @@ import { Secp256k1PrivateKey, Secp256k1PublicKey, Secp256k1Signature } from "./s
 import { KeylessPublicKey, KeylessSignature } from "./keyless";
 import { Signature } from "./signature";
 import { FederatedKeylessPublicKey } from "./federatedKeyless";
+import { MultiKey, MultiKeySignature } from "./multiKey";
 
 export type PrivateKeyInput = Ed25519PrivateKey | Secp256k1PrivateKey;
 
@@ -57,7 +58,9 @@ export class AnyPublicKey extends AccountPublicKey {
       this.variant = AnyPublicKeyVariant.Keyless;
     } else if (publicKey instanceof FederatedKeylessPublicKey) {
       this.variant = AnyPublicKeyVariant.FederatedKeyless;
-    } else {
+    } else if (publicKey instanceof MultiKey) {
+      this.variant = AnyPublicKeyVariant.MultiKey;
+    }else {
       throw new Error("Unsupported public key type");
     }
   }
@@ -159,6 +162,9 @@ export class AnyPublicKey extends AccountPublicKey {
       case AnyPublicKeyVariant.FederatedKeyless:
         publicKey = FederatedKeylessPublicKey.deserialize(deserializer);
         break;
+      case AnyPublicKeyVariant.MultiKey:
+        publicKey = MultiKey.deserialize(deserializer);
+        break;
       default:
         throw new Error(`Unknown variant index for AnyPublicKey: ${variantIndex}`);
     }
@@ -245,6 +251,8 @@ export class AnySignature extends Signature {
       this.variant = AnySignatureVariant.Secp256k1;
     } else if (signature instanceof KeylessSignature) {
       this.variant = AnySignatureVariant.Keyless;
+    } else if (signature instanceof MultiKeySignature) {
+      this.variant = AnySignatureVariant.MultiKey;
     } else {
       throw new Error("Unsupported signature type");
     }
@@ -285,6 +293,9 @@ export class AnySignature extends Signature {
         break;
       case AnySignatureVariant.Keyless:
         signature = KeylessSignature.deserialize(deserializer);
+        break;
+      case AnySignatureVariant.MultiKey:
+        signature = MultiKeySignature.deserialize(deserializer);
         break;
       default:
         throw new Error(`Unknown variant index for AnySignature: ${variantIndex}`);

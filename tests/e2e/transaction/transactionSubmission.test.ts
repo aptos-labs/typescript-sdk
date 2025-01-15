@@ -628,6 +628,53 @@ describe("transaction submission", () => {
       expect(response.signature?.type).toBe("single_sender");
     });
 
+    test.only("it submits a multi key transaction with nested multi keys", async () => {
+      const innerMultiKey = new MultiKey({
+        publicKeys: [
+          singleSignerED25519SenderAccount.publicKey,
+          legacyED25519SenderAccount.publicKey,
+          singleSignerSecp256k1Account.publicKey,
+        ],
+        signaturesRequired: 1,
+      });
+
+      const mainAccount = Account.generate();
+      const multiKey = new MultiKey({
+        publicKeys: [mainAccount.publicKey, innerMultiKey],
+        signaturesRequired: 2,
+      });
+
+      const backupAccount = new MultiKeyAccount({
+        multiKey: innerMultiKey,
+        // the input to signers does not maintain ordering
+        signers: [singleSignerSecp256k1Account],
+      });
+
+      const account = new MultiKeyAccount({
+        multiKey,
+        signers: [mainAccount, backupAccount],
+      });
+
+      await aptos.fundAccount({ accountAddress: account.accountAddress, amount: 100_000_000 });
+
+      const transaction = await aptos.transaction.build.simple({
+        sender: account.accountAddress,
+        data: {
+          function: `0x${contractPublisherAccount.accountAddress.toStringWithoutPrefix()}::transfer::transfer`,
+          functionArguments: [1, receiverAccounts[0].accountAddress],
+        },
+      });
+
+      const senderAuthenticator = aptos.transaction.sign({ signer: account, transaction });
+
+      const response = await aptos.transaction.submit.simple({ transaction, senderAuthenticator });
+      console.log(response.hash);
+      await aptos.waitForTransaction({
+        transactionHash: response.hash,
+      });
+      expect(response.signature?.type).toBe("single_sender");
+    });
+
     test("it submits a multi key transaction with misordered signers", async () => {
       const multiKey = new MultiKey({
         publicKeys: [
