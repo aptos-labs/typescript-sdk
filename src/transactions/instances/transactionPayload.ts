@@ -12,7 +12,13 @@ import { AccountAddress } from "../../core";
 import { Identifier } from "./identifier";
 import { ModuleId } from "./moduleId";
 import type { EntryFunctionArgument, ScriptFunctionArgument, TransactionArgument } from "./transactionArgument";
-import { MoveModuleId, ScriptTransactionArgumentVariants, TransactionPayloadVariants } from "../../types";
+import {
+  MoveModuleId,
+  ScriptTransactionArgumentVariants,
+  TransactionPayloadVariants,
+  TransactionExecutableVariants,
+  TransactionExtraConfigVariants,
+} from "../../types";
 import { TypeTag } from "../typeTag";
 
 /**
@@ -95,6 +101,8 @@ export abstract class TransactionPayload extends Serializable {
         return TransactionPayloadEntryFunction.load(deserializer);
       case TransactionPayloadVariants.Multisig:
         return TransactionPayloadMultiSig.load(deserializer);
+      case TransactionPayloadVariants.Payload:
+        return TransactionPayloadInner.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
@@ -113,14 +121,6 @@ export abstract class TransactionPayload extends Serializable {
 export class TransactionPayloadScript extends TransactionPayload {
   public readonly script: Script;
 
-  /**
-   * Initializes a multi-sig account transaction with the provided payload.
-   *
-   * @param script - The payload of the multi-sig transaction. This can only be an EntryFunction for now, but Script might be
-   * supported in the future.
-   * @group Implementation
-   * @category Transactions
-   */
   constructor(script: Script) {
     super();
     this.script = script;
@@ -139,8 +139,8 @@ export class TransactionPayloadScript extends TransactionPayload {
   }
 
   /**
-   * Loads a MultiSig transaction payload from the provided deserializer.
-   * This function helps in reconstructing a MultiSig transaction payload from its serialized form.
+   * Loads a script transaction payload from the provided deserializer.
+   * This function helps in reconstructing a script transaction payload from its serialized form.
    *
    * @param deserializer - The deserializer used to read the serialized data.
    * @group Implementation
@@ -199,6 +199,260 @@ export class TransactionPayloadMultiSig extends TransactionPayload {
   static load(deserializer: Deserializer): TransactionPayloadMultiSig {
     const value = MultiSig.deserialize(deserializer);
     return new TransactionPayloadMultiSig(value);
+  }
+}
+
+export class TransactionPayloadInner extends TransactionPayload {
+  public readonly executable: TransactionExecutable;
+  public readonly extra_config: TransactionExtraConfig;
+
+  constructor(executable: TransactionExecutable, extra_config: TransactionExtraConfig) {
+    super();
+    this.executable = executable;
+    this.extra_config = extra_config;
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(TransactionPayloadVariants.Payload);
+    this.executable.serialize(serializer);
+    this.extra_config.serialize(serializer);
+  }
+
+  static load(deserializer: Deserializer): TransactionPayloadInner {
+    const executable = TransactionExecutable.deserialize(deserializer);
+    const extra_config = TransactionExtraConfig.deserialize(deserializer);
+    return new TransactionPayloadInner(executable, extra_config);
+  }
+}
+
+/**
+ * Represents a supported Transaction Executable that can be serialized and deserialized.
+ *
+ * This class serves as a base for different types of transaction payloads, allowing for
+ * their serialization into a format suitable for transmission and deserialization back
+ * into their original form.
+ * @group Implementation
+ * @category Transactions
+ */
+export abstract class TransactionExecutable extends Serializable {
+  /**
+   * Serialize a Transaction Payload
+   * @group Implementation
+   * @category Transactions
+   */
+  abstract serialize(serializer: Serializer): void;
+
+  /**
+   * Deserialize a Transaction Payload
+   * @param deserializer - The deserializer instance used to read the serialized data.
+   * @group Implementation
+   * @category Transactions
+   */
+  static deserialize(deserializer: Deserializer): TransactionExecutable {
+    // index enum variant
+    const index = deserializer.deserializeUleb128AsU32();
+    switch (index) {
+      case TransactionExecutableVariants.Script:
+        return TransactionExecutableScript.load(deserializer);
+      case TransactionExecutableVariants.EntryFunction:
+        return TransactionExecutableEntryFunction.load(deserializer);
+      case TransactionExecutableVariants.Empty:
+        return TransactionExecutableEmpty.load(deserializer);
+      default:
+        throw new Error(`Unknown variant index for TransactionExecutable: ${index}`);
+    }
+  }
+}
+
+/**
+ * Represents a transaction executable script that can be serialized and deserialized.
+ *
+ * This class encapsulates a script that defines the logic for a transaction executable.
+ *
+ * @extends TransactionExecutable
+ * @group Implementation
+ * @category Transactions
+ */
+export class TransactionExecutableScript extends TransactionExecutable {
+  public readonly script: Script;
+
+  constructor(script: Script) {
+    super();
+    this.script = script;
+  }
+
+  /**
+   * Serializes the transaction executable, enabling future support for multiple types of inner transaction executables.
+   *
+   * @param serializer - The serializer instance used to serialize the transaction data.
+   * @group Implementation
+   * @category Transactions
+   */
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(TransactionExecutableVariants.Script);
+    this.script.serialize(serializer);
+  }
+
+  /**
+   * Loads a script transaction executable from the provided deserializer.
+   * This function helps in reconstructing a script transaction executable from its serialized form.
+   *
+   * @param deserializer - The deserializer used to read the serialized data.
+   * @group Implementation
+   * @category Transactions
+   */
+  static load(deserializer: Deserializer): TransactionExecutableScript {
+    const script = Script.deserialize(deserializer);
+    return new TransactionExecutableScript(script);
+  }
+}
+
+/**
+ * Represents a transaction executable entry function that can be serialized and deserialized.
+ *
+ * @extends TransactionExecutable
+ * @group Implementation
+ * @category Transactions
+ */
+export class TransactionExecutableEntryFunction extends TransactionExecutable {
+  public readonly entryFunction: EntryFunction;
+
+  constructor(entryFunction: EntryFunction) {
+    super();
+    this.entryFunction = entryFunction;
+  }
+
+  /**
+   * Serializes the transaction executable, enabling future support for multiple types of inner transaction executables.
+   *
+   * @param serializer - The serializer instance used to serialize the transaction data.
+   * @group Implementation
+   * @category Transactions
+   */
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(TransactionExecutableVariants.EntryFunction);
+    this.entryFunction.serialize(serializer);
+  }
+
+  /**
+   * Loads a entry function transaction executable from the provided deserializer.
+   * This function helps in reconstructing a entry function transaction executable from its serialized form.
+   *
+   * @param deserializer - The deserializer used to read the serialized data.
+   * @group Implementation
+   * @category Transactions
+   */
+  static load(deserializer: Deserializer): TransactionExecutableEntryFunction {
+    const entryFunction = EntryFunction.deserialize(deserializer);
+    return new TransactionExecutableEntryFunction(entryFunction);
+  }
+}
+
+/**
+ * Represents a transaction executable entry function that can be serialized and deserialized.
+ *
+ * @extends TransactionExecutable
+ * @group Implementation
+ * @category Transactions
+ */
+export class TransactionExecutableEmpty extends TransactionExecutable {
+  constructor() {
+    super();
+  }
+
+  /**
+   * Serializes the transaction executable, enabling future support for multiple types of inner transaction executables.
+   *
+   * @param serializer - The serializer instance used to serialize the transaction data.
+   * @group Implementation
+   * @category Transactions
+   */
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(TransactionExecutableVariants.Empty);
+  }
+
+  /**
+   * Loads a empty transaction executable from the provided deserializer.
+   * This function helps in reconstructing a empty transaction executable from its serialized form.
+   *
+   * @param deserializer - The deserializer used to read the serialized data.
+   * @group Implementation
+   * @category Transactions
+   */
+  static load(deserializer: Deserializer): TransactionExecutableEmpty {
+    return new TransactionExecutableEmpty();
+  }
+}
+
+/**
+ * Represents a supported TransactionExtraConfig that can be serialized and deserialized.
+ *
+ * This class serves as a base for different types of transaction extra configs, allowing for
+ * their serialization into a format suitable for transmission and deserialization back
+ * into their original form.
+ * @group Implementation
+ * @category Transactions
+ */
+export abstract class TransactionExtraConfig extends Serializable {
+  /**
+   * Serialize a Transaction Extra Config
+   * @group Implementation
+   * @category Transactions
+   */
+  abstract serialize(serializer: Serializer): void;
+
+  /**
+   * Deserialize a Transaction Extra Config
+   * @param deserializer - The deserializer instance used to read the serialized data.
+   * @group Implementation
+   * @category Transactions
+   */
+  static deserialize(deserializer: Deserializer): TransactionExtraConfig {
+    // index enum variant
+    const index = deserializer.deserializeUleb128AsU32();
+    switch (index) {
+      case TransactionExtraConfigVariants.V1:
+        return TransactionExtraConfigV1.load(deserializer);
+      default:
+        throw new Error(`Unknown variant index for TransactionExtraConfig: ${index}`);
+    }
+  }
+}
+
+export class TransactionExtraConfigV1 extends TransactionExtraConfig {
+  public readonly multisigAddress: AccountAddress | undefined;
+  // Question: Is it correct to define replayProtectionNonce as a U64?
+  public readonly replayProtectionNonce: bigint | undefined;
+  // Question: How to make these fields optional?
+  constructor(multisigAddress?: AccountAddress, replayProtectionNonce?: bigint) {
+    super();
+    this.multisigAddress = multisigAddress;
+    this.replayProtectionNonce = replayProtectionNonce;
+  }
+
+  serialize(serializer: Serializer): void {
+    // TODO: How to serialize these optional fields?
+    if (this.multisigAddress) {
+      this.multisigAddress.serialize(serializer);
+    }
+    if (this.replayProtectionNonce) {
+      serializer.serializeU64(this.replayProtectionNonce);
+    }
+  }
+
+  static load(deserializer: Deserializer): TransactionExtraConfigV1 {
+    // TODO: How to serialize these optional fields?
+    const hasMultisigAddress = deserializer.deserializeBool();
+    let multisigAddress;
+    if (hasMultisigAddress) {
+      multisigAddress = AccountAddress.deserialize(deserializer);
+    }
+    const hasReplayProtectionNonce = deserializer.deserializeBool();
+    let replayProtectionNonce;
+    if (hasReplayProtectionNonce) {
+      replayProtectionNonce = deserializer.deserializeU64();
+    }
+    return new TransactionExtraConfigV1(multisigAddress, replayProtectionNonce);
   }
 }
 
@@ -425,27 +679,27 @@ export class Script {
  * @category Transactions
  */
 export class MultiSig {
-  public readonly multisig_address: AccountAddress;
+  public readonly multisigAddress: AccountAddress;
 
   public readonly transaction_payload?: MultiSigTransactionPayload;
 
   /**
    * Contains the payload to run a multi-sig account transaction.
    *
-   * @param multisig_address The multi-sig account address the transaction will be executed as.
+   * @param multisigAddress The multi-sig account address the transaction will be executed as.
    *
    * @param transaction_payload The payload of the multi-sig transaction. This is optional when executing a multi-sig
    *  transaction whose payload is already stored on chain.
    * @group Implementation
    * @category Transactions
    */
-  constructor(multisig_address: AccountAddress, transaction_payload?: MultiSigTransactionPayload) {
-    this.multisig_address = multisig_address;
+  constructor(multisigAddress: AccountAddress, transaction_payload?: MultiSigTransactionPayload) {
+    this.multisigAddress = multisigAddress;
     this.transaction_payload = transaction_payload;
   }
 
   serialize(serializer: Serializer): void {
-    this.multisig_address.serialize(serializer);
+    this.multisigAddress.serialize(serializer);
     // Options are encoded with an extra u8 field before the value - 0x0 is none and 0x1 is present.
     // We use serializeBool below to create this prefix value.
     if (this.transaction_payload === undefined) {
@@ -457,13 +711,13 @@ export class MultiSig {
   }
 
   static deserialize(deserializer: Deserializer): MultiSig {
-    const multisig_address = AccountAddress.deserialize(deserializer);
+    const multisigAddress = AccountAddress.deserialize(deserializer);
     const payloadPresent = deserializer.deserializeBool();
     let transaction_payload;
     if (payloadPresent) {
       transaction_payload = MultiSigTransactionPayload.deserialize(deserializer);
     }
-    return new MultiSig(multisig_address, transaction_payload);
+    return new MultiSig(multisigAddress, transaction_payload);
   }
 }
 

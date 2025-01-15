@@ -49,9 +49,13 @@ import {
   MultiSigTransactionPayload,
   RawTransaction,
   Script,
+  TransactionExecutableScript,
   TransactionPayloadEntryFunction,
+  TransactionPayloadInner,
   TransactionPayloadMultiSig,
   TransactionPayloadScript,
+  TransactionExtraConfigV1,
+  TransactionExecutableEntryFunction,
 } from "../instances";
 import { SignedTransaction } from "../instances/signedTransaction";
 import {
@@ -98,21 +102,29 @@ import { MultiAgentTransaction } from "../instances/multiAgentTransaction";
  * @group Implementation
  * @category Transactions
  */
-export async function generateTransactionPayload(args: InputScriptData): Promise<TransactionPayloadScript>;
+// Question: Is it correct to define the return type as TransactionPayloadScript | TransactionPayloadInner?
+export async function generateTransactionPayload(
+  args: InputScriptData,
+  options?: InputGenerateTransactionOptions,
+): Promise<TransactionPayloadScript | TransactionPayloadInner>;
 /**
  * @group Implementation
  * @category Transactions
  */
+// Question: Is it correct to define the return type as TransactionPayloadEntryFunction | TransactionPayloadInner?
 export async function generateTransactionPayload(
   args: InputEntryFunctionDataWithRemoteABI,
-): Promise<TransactionPayloadEntryFunction>;
+  options?: InputGenerateTransactionOptions,
+): Promise<TransactionPayloadEntryFunction | TransactionPayloadInner>;
 /**
  * @group Implementation
  * @category Transactions
  */
+// Question: Is it correct to define the return type as TransactionPayloadMultiSig | TransactionPayloadInner?
 export async function generateTransactionPayload(
   args: InputMultiSigDataWithRemoteABI,
-): Promise<TransactionPayloadMultiSig>;
+  options?: InputGenerateTransactionOptions,
+): Promise<TransactionPayloadMultiSig | TransactionPayloadInner>;
 
 /**
  * Builds a transaction payload based on the data argument and returns
@@ -128,24 +140,35 @@ export async function generateTransactionPayload(
  */
 export async function generateTransactionPayload(
   args: InputGenerateTransactionPayloadDataWithRemoteABI,
+  options?: InputGenerateTransactionOptions,
 ): Promise<AnyTransactionPayloadInstance> {
+  let { replayProtectionNonce, useTransactionPayloadV2 } = options ?? {};
   if (isScriptDataInput(args)) {
-    return generateTransactionPayloadScript(args);
+    let script = generateScript(args);
+    // If nonce is provided or if useTransactionPayloadV2 is true, we need to use the new format
+    if (replayProtectionNonce || useTransactionPayloadV2) {
+      let executable = new TransactionExecutableScript(script);
+      let extraConfig = new TransactionExtraConfigV1(undefined, replayProtectionNonce);
+      return new TransactionPayloadInner(executable, extraConfig);
+    } else {
+      return new TransactionPayloadScript(generateScript(args));
+    }
+  } else {
+    const { moduleAddress, moduleName, functionName } = getFunctionParts(args.function);
+
+    const functionAbi = await fetchAbi({
+      key: "entry-function",
+      moduleAddress,
+      moduleName,
+      functionName,
+      aptosConfig: args.aptosConfig,
+      abi: args.abi,
+      fetch: fetchEntryFunctionAbi,
+    });
+
+    // Fill in the ABI
+    return generateTransactionPayloadWithABI({ ...args, abi: functionAbi }, options);
   }
-  const { moduleAddress, moduleName, functionName } = getFunctionParts(args.function);
-
-  const functionAbi = await fetchAbi({
-    key: "entry-function",
-    moduleAddress,
-    moduleName,
-    functionName,
-    aptosConfig: args.aptosConfig,
-    abi: args.abi,
-    fetch: fetchEntryFunctionAbi,
-  });
-
-  // Fill in the ABI
-  return generateTransactionPayloadWithABI({ ...args, abi: functionAbi });
 }
 
 /**
@@ -163,18 +186,27 @@ export async function generateTransactionPayload(
  * @group Implementation
  * @category Transactions
  */
-export function generateTransactionPayloadWithABI(args: InputEntryFunctionDataWithABI): TransactionPayloadEntryFunction;
+// Question: Is it correct to define the return type as TransactionPayloadEntryFunction | TransactionPayloadInner?
+export function generateTransactionPayloadWithABI(
+  args: InputEntryFunctionDataWithABI,
+  options?: InputGenerateTransactionOptions,
+): TransactionPayloadEntryFunction | TransactionPayloadInner;
 /**
  * @group Implementation
  * @category Transactions
  */
-export function generateTransactionPayloadWithABI(args: InputMultiSigDataWithABI): TransactionPayloadMultiSig;
+// Question: Is it correct to define the return type as TransactionPayloadMultiSig | TransactionPayloadInner?
+export function generateTransactionPayloadWithABI(
+  args: InputMultiSigDataWithABI,
+  options?: InputGenerateTransactionOptions,
+): TransactionPayloadMultiSig | TransactionPayloadInner;
 /**
  * @group Implementation
  * @category Transactions
  */
 export function generateTransactionPayloadWithABI(
   args: InputGenerateTransactionPayloadDataWithABI,
+  options?: InputGenerateTransactionOptions,
 ): AnyTransactionPayloadInstance {
   const functionAbi = args.abi;
   const { moduleAddress, moduleName, functionName } = getFunctionParts(args.function);
@@ -224,16 +256,28 @@ export function generateTransactionPayloadWithABI(
     functionArguments,
   );
 
-  // Send it as multi sig if it's a multisig payload
-  if ("multisigAddress" in args) {
-    const multisigAddress = AccountAddress.from(args.multisigAddress);
-    return new TransactionPayloadMultiSig(
-      new MultiSig(multisigAddress, new MultiSigTransactionPayload(entryFunctionPayload)),
-    );
-  }
+  let { replayProtectionNonce, useTransactionPayloadV2 } = options ?? {};
+  // If nonce is provided or if useTransactionPayloadV2 is true, we need to use the new payload format
+  if (replayProtectionNonce || useTransactionPayloadV2) {
+    let multisigAddress;
+    if ("multisigAddress" in args) {
+      multisigAddress = AccountAddress.from(args.multisigAddress);
+    }
+    let extraConfig = new TransactionExtraConfigV1(multisigAddress, replayProtectionNonce);
+    let executable = new TransactionExecutableEntryFunction(entryFunctionPayload);
+    return new TransactionPayloadInner(executable, extraConfig);
+  } else {
+    // Send it as multi sig if it's a multisig payload
+    if ("multisigAddress" in args) {
+      const multisigAddress = AccountAddress.from(args.multisigAddress);
+      return new TransactionPayloadMultiSig(
+        new MultiSig(multisigAddress, new MultiSigTransactionPayload(entryFunctionPayload)),
+      );
+    }
 
-  // Otherwise send as an entry function
-  return new TransactionPayloadEntryFunction(entryFunctionPayload);
+    // Otherwise send as an entry function
+    return new TransactionPayloadEntryFunction(entryFunctionPayload);
+  }
 }
 
 /**
@@ -324,13 +368,11 @@ export function generateViewFunctionPayloadWithABI(args: InputViewFunctionDataWi
  * @group Implementation
  * @category Transactions
  */
-function generateTransactionPayloadScript(args: InputScriptData) {
-  return new TransactionPayloadScript(
-    new Script(
-      Hex.fromHexInput(args.bytecode).toUint8Array(),
-      standardizeTypeTags(args.typeArguments),
-      args.functionArguments,
-    ),
+function generateScript(args: InputScriptData) {
+  return new Script(
+    Hex.fromHexInput(args.bytecode).toUint8Array(),
+    standardizeTypeTags(args.typeArguments),
+    args.functionArguments,
   );
 }
 

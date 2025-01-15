@@ -14,6 +14,7 @@ import {
   TransactionPayloadEntryFunction,
   TransactionPayloadMultiSig,
   TransactionPayloadScript,
+  TransactionPayloadInner,
 } from "./instances";
 import { AnyNumber, HexInput, MoveFunctionGenericTypeParam, MoveFunctionId, MoveStructId, MoveValue } from "../types";
 import { TypeTag } from "./typeTag";
@@ -118,6 +119,16 @@ export type InputGenerateTransactionOptions = {
   gasUnitPrice?: number;
   expireTimestamp?: number;
   accountSequenceNumber?: AnyNumber;
+  /**
+   * If nonce is provided, an orderless transaction will be generated.
+   * The `accountSequenceNumber` will be ignored, and the sequence number in the transaction will be hardcoded
+   * to u64::MAX.
+   */
+  // Question: Is it correct to define replayProtectionNonce as a U64?
+  replayProtectionNonce?: bigint;
+  // Question: Do we need this flag?
+  // If true, the transaction payload will be generated with the new format.
+  useTransactionPayloadV2?: boolean;
 };
 
 /**
@@ -129,7 +140,8 @@ export type InputGenerateTransactionOptions = {
 export type AnyTransactionPayloadInstance =
   | TransactionPayloadEntryFunction
   | TransactionPayloadScript
-  | TransactionPayloadMultiSig;
+  | TransactionPayloadMultiSig
+  | TransactionPayloadInner;
 
 /**
  * The data needed to generate a transaction payload for Entry Function, Script, or Multi Sig types.

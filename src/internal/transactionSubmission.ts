@@ -113,14 +113,15 @@ export async function generateTransaction(
 export async function buildTransactionPayload(
   args: { aptosConfig: AptosConfig } & InputGenerateTransactionData,
 ): Promise<AnyTransactionPayloadInstance> {
-  const { aptosConfig, data } = args;
+  const { aptosConfig, data, options } = args;
+
   // Merge in aptosConfig for remote ABI on non-script payloads
   let generateTransactionPayloadData: InputGenerateTransactionPayloadDataWithRemoteABI;
   let payload: AnyTransactionPayloadInstance;
 
   if ("bytecode" in data) {
     // TODO: Add ABI checking later
-    payload = await generateTransactionPayload(data);
+    payload = await generateTransactionPayload(data, options);
   } else if ("multisigAddress" in data) {
     generateTransactionPayloadData = {
       aptosConfig,
@@ -130,7 +131,7 @@ export async function buildTransactionPayload(
       typeArguments: data.typeArguments,
       abi: data.abi,
     };
-    payload = await generateTransactionPayload(generateTransactionPayloadData);
+    payload = await generateTransactionPayload(generateTransactionPayloadData, options);
   } else {
     generateTransactionPayloadData = {
       aptosConfig,
@@ -139,7 +140,7 @@ export async function buildTransactionPayload(
       typeArguments: data.typeArguments,
       abi: data.abi,
     };
-    payload = await generateTransactionPayload(generateTransactionPayloadData);
+    payload = await generateTransactionPayload(generateTransactionPayloadData, options);
   }
   return payload;
 }

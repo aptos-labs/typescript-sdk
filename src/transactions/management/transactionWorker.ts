@@ -77,6 +77,8 @@ export type FailureEventData = {
   error: string;
 };
 
+type ReplayProtector = { type: "SequenceNumber"; value: bigint } | { type: "Nonce"; value: bigint };
+
 /**
  * TransactionWorker provides a simple framework for receiving payloads to be processed.
  *
@@ -97,8 +99,8 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
   readonly account: Account;
 
   // current account sequence number
-  // TODO: Rename Sequnce -> Sequence
-  readonly accountSequnceNumber: AccountSequenceNumber;
+  // Question: Is it okay to rename accountSequnceNumber --> accountSequenceNumber?
+  readonly accountSequenceNumber: AccountSequenceNumber;
 
   readonly taskQueue: AsyncQueue<() => Promise<void>> = new AsyncQueue<() => Promise<void>>();
 
@@ -121,21 +123,21 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
    * @group Implementation
    * @category Transactions
    */
-  outstandingTransactions = new AsyncQueue<[Promise<PendingTransactionResponse>, bigint]>();
+  outstandingTransactions = new AsyncQueue<[Promise<PendingTransactionResponse>, ReplayProtector]>();
 
   /**
    * transactions that have been submitted to chain
    * @group Implementation
    * @category Transactions
    */
-  sentTransactions: Array<[string, bigint, any]> = [];
+  sentTransactions: Array<[string, ReplayProtector, any]> = [];
 
   /**
    * transactions that have been committed to chain
    * @group Implementation
    * @category Transactions
    */
-  executedTransactions: Array<[string, bigint, any]> = [];
+  executedTransactions: Array<[string, ReplayProtector, any]> = [];
 
   /**
    * Initializes a new instance of the class, providing a framework for receiving payloads to be processed.
@@ -161,7 +163,7 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
     this.aptosConfig = aptosConfig;
     this.account = account;
     this.started = false;
-    this.accountSequnceNumber = new AccountSequenceNumber(
+    this.accountSequenceNumber = new AccountSequenceNumber(
       aptosConfig,
       account,
       maxWaitTime,
@@ -183,16 +185,48 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
     try {
       /* eslint-disable no-constant-condition */
       while (true) {
-        const sequenceNumber = await this.accountSequnceNumber.nextSequenceNumber();
-        if (sequenceNumber === null) return;
-        const transaction = await this.generateNextTransaction(this.account, sequenceNumber);
-        if (!transaction) return;
-        const pendingTransaction = signAndSubmitTransaction({
-          aptosConfig: this.aptosConfig,
-          transaction,
-          signer: this.account,
-        });
-        await this.outstandingTransactions.enqueue([pendingTransaction, sequenceNumber]);
+        if (this.transactionsQueue.isEmpty()) return;
+        const [transactionData, options] = await this.transactionsQueue.dequeue();
+        let { replayProtectionNonce } = options ?? {};
+        if (replayProtectionNonce) {
+          // Generate orderless transaction with nonce
+          const transaction = await generateTransaction({
+            aptosConfig: this.aptosConfig,
+            sender: this.account.accountAddress,
+            data: transactionData,
+            options,
+          });
+          if (!transaction) return;
+          const pendingTransaction = signAndSubmitTransaction({
+            aptosConfig: this.aptosConfig,
+            transaction,
+            signer: this.account,
+          });
+          await this.outstandingTransactions.enqueue([
+            pendingTransaction,
+            { type: "Nonce", value: replayProtectionNonce },
+          ]);
+        } else {
+          // Generate sequence number based transaction
+          const sequenceNumber = await this.accountSequenceNumber.nextSequenceNumber();
+          if (sequenceNumber === null) return;
+          const transaction = await generateTransaction({
+            aptosConfig: this.aptosConfig,
+            sender: this.account.accountAddress,
+            data: transactionData,
+            options: { ...options, accountSequenceNumber: sequenceNumber },
+          });
+          if (!transaction) return;
+          const pendingTransaction = signAndSubmitTransaction({
+            aptosConfig: this.aptosConfig,
+            transaction,
+            signer: this.account,
+          });
+          await this.outstandingTransactions.enqueue([
+            pendingTransaction,
+            { type: "SequenceNumber", value: sequenceNumber },
+          ]);
+        }
       }
     } catch (error: any) {
       if (error instanceof AsyncQueueCancelledError) {
@@ -220,36 +254,36 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
       /* eslint-disable no-constant-condition */
       while (true) {
         const awaitingTransactions = [];
-        const sequenceNumbers = [];
-        let [pendingTransaction, sequenceNumber] = await this.outstandingTransactions.dequeue();
+        const replayProtectors = [];
+        let [pendingTransaction, replayProtector] = await this.outstandingTransactions.dequeue();
 
         awaitingTransactions.push(pendingTransaction);
-        sequenceNumbers.push(sequenceNumber);
+        replayProtectors.push(replayProtector);
 
         while (!this.outstandingTransactions.isEmpty()) {
-          [pendingTransaction, sequenceNumber] = await this.outstandingTransactions.dequeue();
+          [pendingTransaction, replayProtector] = await this.outstandingTransactions.dequeue();
 
           awaitingTransactions.push(pendingTransaction);
-          sequenceNumbers.push(sequenceNumber);
+          replayProtectors.push(replayProtector);
         }
         // send awaiting transactions to chain
         const sentTransactions = await Promise.allSettled(awaitingTransactions);
-        for (let i = 0; i < sentTransactions.length && i < sequenceNumbers.length; i += 1) {
+        for (let i = 0; i < sentTransactions.length && i < replayProtectors.length; i += 1) {
           // check sent transaction status
           const sentTransaction = sentTransactions[i];
-          sequenceNumber = sequenceNumbers[i];
+          replayProtector = replayProtectors[i];
           if (sentTransaction.status === promiseFulfilledStatus) {
             // transaction sent to chain
-            this.sentTransactions.push([sentTransaction.value.hash, sequenceNumber, null]);
+            this.sentTransactions.push([sentTransaction.value.hash, replayProtector, null]);
             // check sent transaction execution
             this.emit(TransactionWorkerEventsEnum.TransactionSent, {
               message: `transaction hash ${sentTransaction.value.hash} has been committed to chain`,
               transactionHash: sentTransaction.value.hash,
             });
-            await this.checkTransaction(sentTransaction, sequenceNumber);
+            await this.checkTransaction(sentTransaction, replayProtector);
           } else {
             // send transaction failed
-            this.sentTransactions.push([sentTransaction.status, sequenceNumber, sentTransaction.reason]);
+            this.sentTransactions.push([sentTransaction.status, replayProtector, sentTransaction.reason]);
             this.emit(TransactionWorkerEventsEnum.TransactionSendFailed, {
               message: `failed to commit transaction ${this.sentTransactions.length} with error ${sentTransaction.reason}`,
               error: sentTransaction.reason,
@@ -275,7 +309,12 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
    * @group Implementation
    * @category Transactions
    */
-  async checkTransaction(sentTransaction: PromiseFulfilledResult<PendingTransactionResponse>, sequenceNumber: bigint) {
+
+  // Question: Is it okay to change this function signature to take replayProtector instead of sequenceNumber?
+  async checkTransaction(
+    sentTransaction: PromiseFulfilledResult<PendingTransactionResponse>,
+    replayProtector: ReplayProtector,
+  ) {
     try {
       const waitFor: Array<Promise<TransactionResponse>> = [];
       waitFor.push(waitForTransaction({ aptosConfig: this.aptosConfig, transactionHash: sentTransaction.value.hash }));
@@ -285,14 +324,14 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
         const executedTransaction = sentTransactions[i];
         if (executedTransaction.status === promiseFulfilledStatus) {
           // transaction executed to chain
-          this.executedTransactions.push([executedTransaction.value.hash, sequenceNumber, null]);
+          this.executedTransactions.push([executedTransaction.value.hash, replayProtector, null]);
           this.emit(TransactionWorkerEventsEnum.TransactionExecuted, {
             message: `transaction hash ${executedTransaction.value.hash} has been executed on chain`,
             transactionHash: sentTransaction.value.hash,
           });
         } else {
           // transaction execution failed
-          this.executedTransactions.push([executedTransaction.status, sequenceNumber, executedTransaction.reason]);
+          this.executedTransactions.push([executedTransaction.status, replayProtector, executedTransaction.reason]);
           this.emit(TransactionWorkerEventsEnum.TransactionExecutionFailed, {
             message: `failed to execute transaction ${this.executedTransactions.length} with error ${executedTransaction.reason}`,
             error: executedTransaction.reason,
@@ -324,9 +363,10 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
     this.transactionsQueue.enqueue([transactionData, options]);
   }
 
+  // Question: Can we deprecate this function?
   /**
    * Generates a signed transaction that can be submitted to the chain.
-   *
+   * @deprecated
    * @param account - An Aptos account used as the sender of the transaction.
    * @param sequenceNumber - A sequence number the transaction will be generated with.
    * @returns A signed transaction object or undefined if the transaction queue is empty.
