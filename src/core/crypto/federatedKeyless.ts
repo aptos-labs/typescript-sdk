@@ -6,7 +6,7 @@ import { Deserializer, Serializer } from "../../bcs";
 import { HexInput, AnyPublicKeyVariant, SigningScheme } from "../../types";
 import { AuthenticationKey } from "../authenticationKey";
 import { AccountAddress, AccountAddressInput } from "../accountAddress";
-import { KeylessPublicKey, KeylessSignature } from "./keyless";
+import { getIssAudAndUidVal, KeylessPublicKey, KeylessSignature } from "./keyless";
 
 /**
  * Represents the FederatedKeylessPublicKey public key
@@ -114,6 +114,20 @@ export class FederatedKeylessPublicKey extends AccountPublicKey {
     uidKey?: string;
   }): FederatedKeylessPublicKey {
     return new FederatedKeylessPublicKey(args.jwkAddress, KeylessPublicKey.fromJwtAndPepper(args));
+  }
+
+  static fromJwtAndPepperWithoutUnescaping(args: {
+    jwt: string;
+    pepper: HexInput;
+    jwkAddress: AccountAddressInput;
+    uidKey?: string;
+  }): FederatedKeylessPublicKey {
+    const { jwt, pepper, uidKey = "sub" } = args;
+    const { iss, aud, uidVal } = getIssAudAndUidVal({ jwt, uidKey });
+    return new FederatedKeylessPublicKey(
+      args.jwkAddress,
+      KeylessPublicKey.create({ iss, uidKey, uidVal, aud, pepper }),
+    );
   }
 
   static isInstance(publicKey: PublicKey) {

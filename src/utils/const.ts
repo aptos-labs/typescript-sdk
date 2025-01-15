@@ -95,3 +95,5 @@ export enum ProcessorType {
  * where project-id can contain letters, numbers, hyphens, and underscores
  */
 export const FIREBASE_AUTH_ISS_PATTERN = /^https:\/\/securetoken\.google\.com\/[a-zA-Z0-9-_]+$/;
+
+export const COGNITO_ISS_PATTERN = /^https:\/\/cognito-idp\.[a-zA-Z0-9-_]+\.amazonaws\.com\/[a-zA-Z0-9-_]+$/;

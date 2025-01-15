@@ -29,7 +29,9 @@
   "dependencies": {
     "@noble/curves": "^1.4.0",
     "@types/readline-sync": "^1.4.8",
+    "axios": "^1.7.7",
     "dotenv": "^16.3.1",
+    "jwt-decode": "^4.0.0",
     "npm-run-all": "latest",
     "readline-sync": "^1.4.10",
     "superagent": "^8.1.2"

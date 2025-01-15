@@ -34,6 +34,7 @@ import { memoizeAsync } from "../../utils/memoize";
 import { AccountAddress, AccountAddressInput } from "../accountAddress";
 import { getErrorMessage } from "../../utils";
 import { KeylessError, KeylessErrorType } from "../../errors";
+import { getClaimWithoutUnescaping } from "./utils";
 
 /**
  * @group Implementation
@@ -264,15 +265,9 @@ export class KeylessPublicKey extends AccountPublicKey {
    */
   static fromJwtAndPepper(args: { jwt: string; pepper: HexInput; uidKey?: string }): KeylessPublicKey {
     const { jwt, pepper, uidKey = "sub" } = args;
-    const jwtPayload = jwtDecode<JwtPayload & { [key: string]: string }>(jwt);
-    if (typeof jwtPayload.iss !== "string") {
-      throw new Error("iss was not found");
-    }
-    if (typeof jwtPayload.aud !== "string") {
-      throw new Error("aud was not found or an array of values");
-    }
-    const uidVal = jwtPayload[uidKey];
-    return KeylessPublicKey.create({ iss: jwtPayload.iss, uidKey, uidVal, aud: jwtPayload.aud, pepper });
+
+    const { iss, aud, uidVal } = getIssAudAndUidVal({ jwt, uidKey });
+    return KeylessPublicKey.create({ iss, uidKey, uidVal, aud, pepper });
   }
 
   /**
@@ -930,6 +925,28 @@ export function getIssAudAndUidVal(args: { jwt: string; uidKey?: string }): {
   }
   const uidVal = jwtPayload[uidKey];
   return { iss: jwtPayload.iss, aud: jwtPayload.aud, uidVal };
+}
+
+/**
+ * Parses a JWT and returns the 'iss', 'aud', and 'uid' values without unescaping the values.
+ *
+ * @param args - The arguments for parsing the JWT.
+ * @param args.jwt - The JWT to parse.
+ * @param args.uidKey - The key to use for the 'uid' value; defaults to 'sub'.
+ * @returns The 'iss', 'aud', and 'uid' values from the JWT.
+ */
+export function getIssAudAndUidValWithoutUnescaping(args: { jwt: string; uidKey?: string }): {
+  iss: string;
+  aud: string;
+  uidVal: string;
+} {
+  const { jwt, uidKey = "sub" } = args;
+  getIssAudAndUidVal(args);
+  return {
+    iss: getClaimWithoutUnescaping(jwt, "iss"),
+    aud: getClaimWithoutUnescaping(jwt, "aud"),
+    uidVal: getClaimWithoutUnescaping(jwt, uidKey),
+  };
 }
 
 /**
