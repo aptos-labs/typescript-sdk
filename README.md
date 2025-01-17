@@ -221,6 +221,13 @@ If you found a bug or would like to request a feature, please file an [issue](ht
 If, based on the discussion on an issue you would like to offer a code change, please make a [pull request](https://github.com/aptos-labs/aptos-ts-sdk/pulls).
 If neither of these describes what you would like to contribute, check out the [contributing guide](https://github.com/aptos-labs/aptos-ts-sdk/blob/main/CONTRIBUTING.md).
 
+## Running unit tests
+
+To run a unit test in this repo, for example, the keyless end-to-end unit test in `tests/e2e/api/keyless.test.ts`:
+```
+pnpm jest keyless.test.ts
+```
+
 [npm-image-version]: https://img.shields.io/npm/v/%40aptos-labs%2Fts-sdk.svg
 [npm-image-downloads]: https://img.shields.io/npm/dm/%40aptos-labs%2Fts-sdk.svg
 [npm-url]: https://npmjs.org/package/@aptos-labs/ts-sdk
