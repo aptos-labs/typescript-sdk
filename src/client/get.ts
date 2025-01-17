@@ -191,3 +191,45 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
   } while (cursor !== null && cursor !== undefined);
   return out as Res;
 }
+
+/// This function is a helper for paginating using a function wrapping an API using offset instead of start
+export async function paginateWithObfuscatedCursor<Req extends Record<string, any>, Res extends Array<{}>>(
+  options: GetAptosRequestOptions,
+): Promise<Res> {
+  const out: any[] = [];
+  let cursor: string | undefined;
+  const requestParams = options.params as { offset?: string; limit?: number };
+  const totalLimit = requestParams.limit;
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    const response = await get<Req, Res>({
+      type: AptosApiType.FULLNODE,
+      aptosConfig: options.aptosConfig,
+      originMethod: options.originMethod,
+      path: options.path,
+      params: requestParams,
+      overrides: options.overrides,
+    });
+    /**
+     * the cursor is a "state key" from the API perspective. Client
+     * should not need to "care" what it represents but just use it
+     * to query the next chunk of data.
+     */
+    cursor = response.headers["x-aptos-cursor"];
+    // Now that we have the cursor (if any), we remove the headers before
+    // adding these to the output of this function.
+    delete response.headers;
+    out.push(...response.data);
+    requestParams.offset = cursor;
+
+    // Re-evaluate length
+    if (totalLimit !== undefined) {
+      const newLimit = totalLimit - out.length;
+      if (newLimit <= 0) {
+        break;
+      }
+      requestParams.limit = newLimit;
+    }
+  } while (cursor !== null && cursor !== undefined);
+  return out as Res;
+}

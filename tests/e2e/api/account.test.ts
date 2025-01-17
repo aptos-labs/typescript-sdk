@@ -30,12 +30,24 @@ describe("account api", () => {
     });
 
     test("it fetches account modules", async () => {
-      const config = new AptosConfig({ network: Network.LOCAL });
-      const aptos = new Aptos(config);
+      const { aptos } = getAptosClient();
       const data = await aptos.getAccountModules({
         accountAddress: "0x1",
       });
       expect(data.length).toBeGreaterThan(0);
+    });
+
+    test("it fetches account modules with pagination", async () => {
+      const config = new AptosConfig({ network: Network.LOCAL });
+      const aptos = new Aptos(config);
+      const data = await aptos.getAccountModules({
+        accountAddress: "0x1",
+        options: {
+          offset: 1,
+          limit: 1,
+        },
+      });
+      expect(data.length).toEqual(1);
     });
 
     test("it fetches an account module", async () => {
@@ -55,6 +67,19 @@ describe("account api", () => {
         accountAddress: "0x1",
       });
       expect(data.length).toBeGreaterThan(0);
+    });
+
+    test("it fetches account resources with pagination", async () => {
+      const config = new AptosConfig({ network: Network.LOCAL });
+      const aptos = new Aptos(config);
+      const data = await aptos.getAccountResources({
+        accountAddress: "0x1",
+        options: {
+          offset: 1,
+          limit: 1,
+        },
+      });
+      expect(data.length).toEqual(1);
     });
 
     test("it fetches an account resource without a type", async () => {

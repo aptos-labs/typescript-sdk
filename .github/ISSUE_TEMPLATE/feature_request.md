@@ -13,7 +13,7 @@ assignees: ''
 
 ## Motivation
 
-**Is your feature request related to a problem? Please describe you use case.**
+**Is your feature request related to a problem? Please describe your use case.**
 <!-- A clear description of what the problem is. Ex. I'm always frustrated when I try to do [...] -->
 
 <!-- Please link to any relevant issues or other pull requests! -->

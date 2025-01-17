@@ -12,7 +12,7 @@ import { Aptos, AptosConfig, Network, NetworkToNetworkName } from "../../src";
  *
  * The APTOS_NETWORK env var is applied first, followed by the others. So if you set
  * APTOS_NETWORK=devnet and APTOS_NODE_API_URL=http://localhost:8080, it will use the
- * given URL for the node API and the the default URLs for devnet for the other APIs.
+ * given URL for the node API and the default URLs for devnet for the other APIs.
  */
 export function getAptosClient(additionalConfig?: Partial<AptosConfig>): { aptos: Aptos; config: AptosConfig } {
   const networkRaw = process.env.APTOS_NETWORK;

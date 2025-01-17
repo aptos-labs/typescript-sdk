@@ -107,7 +107,7 @@ export class Account {
    * This function may call the API multiple times to auto paginate through results.
    *
    * @param args.accountAddress - The Aptos account address to query modules for.
-   * @param args.options.offset - The number of modules to start returning results from.
+   * @param args.options.offset - The cursor to start returning results from.  Note, this is obfuscated and is not an index.
    * @param args.options.limit - The maximum number of results to return.
    * @param args.options.ledgerVersion - The ledger version to query; if not provided, it retrieves the latest version.
    *
@@ -229,7 +229,7 @@ export class Account {
    * This function may call the API multiple times to auto paginate through results.
    *
    * @param args.accountAddress - The Aptos account address to query resources for.
-   * @param args.options.offset - The number of resources to start returning results from.
+   * @param args.options.offset - The cursor to start returning results from.  Note, this is obfuscated and is not an index.
    * @param args.options.limit - The maximum number of results to return.
    * @param args.options.ledgerVersion - The ledger version to query; if not provided, it will get the latest version.
    * @returns Account resources.
