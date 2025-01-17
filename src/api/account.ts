@@ -653,7 +653,7 @@ export class Account {
   }
 
   /**
-   * Retrieves the current amount of APT for a specified account.
+   * Retrieves the current amount of APT for a specified account. If the account does not exist, it will return 0.
    *
    * @param args The arguments for the account query.
    * @param args.accountAddress The account address for which to retrieve the APT amount.
