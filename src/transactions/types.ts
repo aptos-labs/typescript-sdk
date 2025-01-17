@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { CallArgument } from "@aptos-labs/script-composer-pack";
 import { AptosConfig } from "../api/aptosConfig";
 import { MoveOption, MoveString, MoveVector } from "../bcs/serializable/moveStructs";
 import { Bool, U128, U16, U256, U32, U64, U8 } from "../bcs/serializable/movePrimitives";
@@ -192,6 +193,16 @@ export type InputMultiSigDataWithABI = {
  * @category Transactions
  */
 export type InputEntryFunctionDataWithRemoteABI = InputEntryFunctionData & { aptosConfig: AptosConfig };
+
+/**
+ * The data needed to generate a batched function payload
+ */
+export type InputBatchedFunctionData = {
+  function: MoveFunctionId;
+  typeArguments?: Array<TypeArgument>;
+  functionArguments: Array<EntryFunctionArgumentTypes | CallArgument | SimpleEntryFunctionArgumentTypes>;
+};
+
 /**
  * The data needed to generate a Multi Sig payload
  * @group Implementation

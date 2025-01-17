@@ -10,6 +10,8 @@ All notable changes to the Aptos TypeScript SDK will be captured in this file. T
 - Add `AccountUtils` class to help with account serialization and deserialization
 - Add `SingleKeySigner` interface which adds the ability to get the `AnyPublicKey` from a `SingleKeyAccount`
 - We now throw an error earlier when you try to use the faucet with testnet or mainnet, rather than letting the call happen and then fail later.
+- [`Breaking`] Revert new `scriptComposer` api in transactionSubmission api to allow SDK callers to invoke multiple Move functions inside a same transaction and compose the calls dynamically.
+
 
 # 1.33.1 (2024-11-28)
 
@@ -26,7 +28,6 @@ All notable changes to the Aptos TypeScript SDK will be captured in this file. T
 # 1.32.1 (2024-11-11)
 
 - Add support for Firebase issuers in the `updateFederatedKeylessJwkSetTransaction` function
-- [`Breaking`] Revert new `scriptComposer` api in transactionSubmission api to allow SDK callers to invoke multiple Move functions inside a same transaction and compose the calls dynamically.
 
 # 1.32.0 (2024-11-08)
 
