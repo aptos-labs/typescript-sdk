@@ -3,7 +3,9 @@
 All notable changes to the Aptos TypeScript SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
-- [`Fix`] Fixes pagination for GetAccountModules and GetAccountResources.  Also, adds more appropriate documentation on offset.
+
+- [`Fix`] Fixes pagination for GetAccountModules and GetAccountResources. Also, adds more appropriate documentation on offset.
+- [`Fix`] Update `getAccountAPTAmount` documentation to clarify that it will return 0 if the account does not exist.
 
 - node now no longer supports older than v20
 - overriding cross spawn for patch
