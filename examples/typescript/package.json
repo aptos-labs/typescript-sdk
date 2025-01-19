@@ -21,6 +21,8 @@
     "keyless": "ts-node keyless.ts",
     "keyless_mainnet": "ts-node keyless_mainnet.ts",
     "local_node": "ts-node local_node.ts",
+    "any_authenticator_account_abstraction": "ts-node any_authenticator_account_abstraction.ts",
+    "hello_world_authenticator_account_abstraction": "ts-node hello_world_authenticator_account_abstraction.ts",
     "test": "run-s simple_transfer multi_agent_transfer simple_sponsored_transaction transfer_coin custom_client publish_package_from_filepath external_signing sign_struct publish_package_from_filepath external_signing your_coin your_fungible_asset"
   },
   "keywords": [],

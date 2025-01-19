@@ -1,0 +1,10 @@
+[package]
+name = "account_abstraction"
+version = "0.0.0"
+
+[addresses]
+deployer = "_"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-framework", rev = "devnet" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-framework.git", subdir = "aptos-stdlib", rev = "devnet" }

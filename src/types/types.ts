@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { AccountAddress } from "../core";
 import { Network } from "../utils/apiEndpoints";
 import { OrderBy, TokenStandard } from "./indexer";
 
@@ -106,6 +107,7 @@ export enum AccountAuthenticatorVariant {
   SingleKey = 2,
   MultiKey = 3,
   NoAccountAuthenticator = 4,
+  Abstraction = 5,
 }
 
 /**
@@ -1127,6 +1129,12 @@ export type Event = {
    * The JSON representation of the event
    */
   data: any;
+};
+
+export type FunctionInfo = {
+  moduleAddress: AccountAddress;
+  moduleName: string;
+  functionName: string;
 };
 
 /**

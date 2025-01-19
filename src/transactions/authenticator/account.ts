@@ -8,7 +8,9 @@ import { AnyPublicKey, AnySignature } from "../../core/crypto";
 import { Ed25519PublicKey, Ed25519Signature } from "../../core/crypto/ed25519";
 import { MultiEd25519PublicKey, MultiEd25519Signature } from "../../core/crypto/multiEd25519";
 import { MultiKey, MultiKeySignature } from "../../core/crypto/multiKey";
-import { AccountAuthenticatorVariant } from "../../types";
+import { AccountAuthenticatorVariant, FunctionInfo, HexInput } from "../../types";
+import { AbstractionAuthDataVariant } from "../../types/abstraction";
+import { AccountAddress, Hex } from "../../core";
 
 /**
  * Represents an account authenticator that can handle multiple authentication variants.
@@ -43,6 +45,8 @@ export abstract class AccountAuthenticator extends Serializable {
         return AccountAuthenticatorMultiKey.load(deserializer);
       case AccountAuthenticatorVariant.NoAccountAuthenticator:
         return AccountAuthenticatorNoAccountAuthenticator.load(deserializer);
+      case AccountAuthenticatorVariant.Abstraction:
+        return AccountAuthenticatorAbstraction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for AccountAuthenticator: ${index}`);
     }
@@ -261,5 +265,44 @@ export class AccountAuthenticatorNoAccountAuthenticator extends AccountAuthentic
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static load(deserializer: Deserializer): AccountAuthenticatorNoAccountAuthenticator {
     return new AccountAuthenticatorNoAccountAuthenticator();
+  }
+}
+
+export class AccountAuthenticatorAbstraction extends AccountAuthenticator {
+  public readonly functionInfo: FunctionInfo;
+
+  public readonly signingMessageDigest: Hex;
+
+  public readonly authenticator: Hex;
+
+  constructor(functionInfo: FunctionInfo, signingMessageDigest: HexInput, authenticator: HexInput) {
+    super();
+    this.functionInfo = functionInfo;
+    this.authenticator = Hex.fromHexInput(authenticator);
+    this.signingMessageDigest = Hex.fromHexInput(Hex.fromHexInput(signingMessageDigest).toUint8Array());
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(AccountAuthenticatorVariant.Abstraction);
+    this.functionInfo.moduleAddress.serialize(serializer);
+    serializer.serializeStr(this.functionInfo.moduleName);
+    serializer.serializeStr(this.functionInfo.functionName);
+    serializer.serializeU32AsUleb128(AbstractionAuthDataVariant.V1);
+    serializer.serializeBytes(this.signingMessageDigest.toUint8Array());
+    serializer.serializeBytes(this.authenticator.toUint8Array());
+  }
+
+  static load(deserializer: Deserializer): AccountAuthenticatorAbstraction {
+    const moduleAddress = AccountAddress.deserialize(deserializer);
+    const moduleName = deserializer.deserializeStr();
+    const functionName = deserializer.deserializeStr();
+    deserializer.deserializeUleb128AsU32();
+    const signingMessageDigest = deserializer.deserializeBytes();
+    const authenticator = deserializer.deserializeBytes();
+    return new AccountAuthenticatorAbstraction(
+      { moduleAddress, moduleName, functionName },
+      signingMessageDigest,
+      authenticator,
+    );
   }
 }

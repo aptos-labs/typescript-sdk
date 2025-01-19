@@ -15,6 +15,7 @@ import { Transaction } from "./transaction";
 import { Table } from "./table";
 import { Keyless } from "./keyless";
 import { AptosObject } from "./object";
+import { AccountAbstraction } from "./account/abstraction";
 
 /**
  * The main entry point for interacting with the Aptos APIs,

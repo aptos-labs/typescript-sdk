@@ -47,12 +47,15 @@ import { CurrentFungibleAssetBalancesBoolExp } from "../types/generated/types";
 import { view } from "../internal/view";
 import { isEncodedStruct, parseEncodedStruct } from "../utils";
 import { memoizeAsync } from "../utils/memoize";
+import { AccountAbstraction } from "./account/abstraction";
 
 /**
  * A class to query all `Account` related queries on Aptos.
  * @group Account
  */
 export class Account {
+  abstraction: AccountAbstraction;
+
   /**
    * Creates an instance of the Aptos client with the provided configuration.
    *
@@ -73,7 +76,9 @@ export class Account {
    * ```
    * @group Account
    */
-  constructor(readonly config: AptosConfig) {}
+  constructor(readonly config: AptosConfig) {
+    this.abstraction = new AccountAbstraction(config);
+  }
 
   /**
    * Queries the current state for an Aptos account given its account address.
